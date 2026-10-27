@@ -1,0 +1,9 @@
+{
+  "name": "library-system",
+  "version": "1.0.0",
+  "description": "Library Seat Reservation System",
+  "scripts": {
+    "start": "python3 app.py"
+  },
+  "dependencies": {}
+}
