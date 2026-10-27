@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+cloudflared.exe
+*.log
+*.tmp
+.DS_Store
+*.bat
+*.vbs

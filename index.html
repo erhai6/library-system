@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智座星野 - 图书馆座位预约系统</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- TensorFlow.js and COCO-SSD model via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+</head>
+<body>
+    <header>
+        <h1>智座星野</h1>
+        <p>图书馆座位预约 &amp; AI 监控示例</p>
+    </header>
+
+    <section id="seat-section">
+        <h2>座位选择</h2>
+        <div id="seat-grid"></div>
+    </section>
+
+    <section id="monitor-section">
+        <h2>AI 监控（摄像头）</h2>
+        <video id="webcam" autoplay muted playsinline width="320" height="240"></video>
+        <canvas id="overlay" width="320" height="240" style="position:absolute; top:0; left:0;"></canvas>
+        <p>检测状态：<span id="status">加载中…</span></p>
+    </section>
+
+    <section id="action-section" style="display:none;">
+        <h2>当前座位</h2>
+        <p>座位号：<span id="current-seat"></span></p>
+        <button id="break-btn">暂离报备（5 分钟）</button>
+        <button id="release-btn">立即释放</button>
+        <p>剩余时间：<span id="timer"></span></p>
+    </section>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智座星野 - 图书馆管理与AI监控指挥中心</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <!-- 引入 TensorFlow.js & COCO-SSD 模型供管理员巡视检测 -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <style>
+        .admin-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: white;
+            padding: 1.2rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 0.3rem 0;
+        }
+        .stat-label {
+            font-size: 0.88rem;
+            color: #718096;
+        }
+
+        /* 筛选工具栏 */
+        .filter-toolbar {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-input {
+            padding: 0.5rem 0.8rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            min-width: 180px;
+        }
+
+        table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; background: white; border-radius: 8px; overflow: hidden; font-size: 0.9rem; }
+        th, td { border: 1px solid #edf2f7; padding: 10px; text-align: center; }
+        th { background: #4a90e2; color: white; font-weight: 600; }
+        tr:nth-child(even) { background: #fafbfc; }
+        
+        .btn-action-small { padding: 4px 10px; border-radius: 4px; border: none; font-size: 0.82rem; cursor: pointer; font-weight: 500; }
+        .release-btn { background: #dc3545; color: white; }
+        .release-btn:hover { background: #c82333; }
+        .btn-reset-violation { background: #28a745; color: white; }
+        .btn-reset-violation:hover { background: #218838; }
+
+        .badge-admin { background:#dc3545; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem; }
+        .badge-user  { background:#4a90e2; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem; }
+        .badge-restricted { background:#e53e3e; color:white; padding:3px 8px; border-radius:10px; font-size:0.75rem; font-weight:bold; }
+        .badge-normal { background:#38a169; color:white; padding:3px 8px; border-radius:10px; font-size:0.75rem; }
+
+        /* AI 监控视窗 */
+        .ai-monitor-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            background: white;
+            padding: 1.2rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        @media (max-width: 800px) {
+            .ai-monitor-container { grid-template-columns: 1fr; }
+        }
+        .video-box {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 280px;
+        }
+    </style>
+</head>
+<body style="padding-bottom: 30px;">
+    <header>
+        <div class="header-inner">
+            <h1 class="header-title">智座星野 · 图书馆管理与AI监控中心</h1>
+            <div class="header-user">
+                <span>🛡️ 管理员：<strong id="admin-name">系统管理员</strong></span>
+                <a href="javascript:void(0)" id="logout-btn">退出登录</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 顶部主导航 -->
+        <div class="desktop-tabs" style="display:flex;">
+            <button class="desktop-tab-btn active" id="tab-btn-dashboard">📊 实时监控大屏</button>
+            <button class="desktop-tab-btn" id="tab-btn-reservations">📋 预约记录多维检索</button>
+            <button class="desktop-tab-btn" id="tab-btn-users">👥 学生名单与违约惩罚</button>
+            <button class="desktop-tab-btn" id="tab-btn-ai">📷 AI 视觉在馆巡查</button>
+        </div>
+
+        <!-- 1. 监控大屏 Tab -->
+        <div id="tab-dashboard" class="tab-panel" style="display:block;">
+            <div class="admin-dashboard">
+                <div class="stat-card">
+                    <div class="stat-label">今日总预约人次</div>
+                    <div class="stat-number" id="stat-today-total">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">当前入座签到中</div>
+                    <div class="stat-number" id="stat-active" style="color:#28a745;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">已预约待入座</div>
+                    <div class="stat-number" id="stat-reserved" style="color:#ffc107;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">全馆实时利用率</div>
+                    <div class="stat-number" id="stat-utilization">0%</div>
+                </div>
+            </div>
+
+            <div class="mobile-card">
+                <h3 style="margin:0 0 1rem 0; font-size:1.05rem;">🏢 各楼层在座负荷概览</h3>
+                <div id="floor-stat-container" style="display:flex; gap:1.5rem; flex-wrap:wrap;">
+                    <!-- 动态渲染 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 预约记录管理 Tab (带多维组合筛选) -->
+        <div id="tab-reservations" class="tab-panel" style="display:none;">
+            <!-- 筛选工具栏 -->
+            <div class="filter-toolbar">
+                <input type="text" id="res-filter-keyword" class="filter-input" placeholder="🔍 搜索学生姓名 / 学号 / 座位号..." />
+                
+                <select id="res-filter-status" class="filter-input" style="min-width:140px;">
+                    <option value="">全部状态 (全部)</option>
+                    <option value="reserved">待入座签到 (reserved)</option>
+                    <option value="active">正在使用中 (active)</option>
+                    <option value="released">正常已释放 (released)</option>
+                    <option value="timeout_released">⚠️ 超时违规释放 (timeout)</option>
+                </select>
+
+                <input type="date" id="res-filter-date" class="filter-input" style="min-width:150px;" title="按预约日期筛选" />
+
+                <button id="res-filter-btn" style="background:var(--primary); color:white; border:none; padding:0.55rem 1.4rem; border-radius:6px; cursor:pointer; font-weight:bold;">
+                    🔎 立即筛选
+                </button>
+                <button id="res-filter-reset" style="background:#edf2f7; color:#4a5568; border:1px solid #cbd5e0; padding:0.55rem 1rem; border-radius:6px; cursor:pointer;">
+                    重置条件
+                </button>
+            </div>
+
+            <div style="font-size:0.85rem; color:#718096; margin-bottom:0.4rem; display:flex; justify-content:space-between;">
+                <span>共检索出 <strong id="res-count-badge" style="color:var(--primary);">0</strong> 条预约数据</span>
+                <span>💡 支持根据学生、学号、座位或违约状态即时查找</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>预约号</th>
+                        <th>座位信息</th>
+                        <th>预约学生</th>
+                        <th>开始时间</th>
+                        <th>结束时间</th>
+                        <th>状态标签</th>
+                        <th>管理操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
+
+        <!-- 3. 用户管理 Tab (带违约情况与黑名单解除) -->
+        <div id="tab-users" class="tab-panel" style="display:none;">
+            <div class="filter-toolbar">
+                <input type="text" id="user-filter-keyword" class="filter-input" placeholder="🔍 搜索学生姓名 / 学号用户名..." />
+
+                <select id="user-filter-restricted" class="filter-input" style="min-width:160px;">
+                    <option value="">全部学生名单</option>
+                    <option value="1">🚫 仅看违约受限黑名单</option>
+                </select>
+
+                <button id="user-filter-btn" style="background:var(--primary); color:white; border:none; padding:0.55rem 1.4rem; border-radius:6px; cursor:pointer; font-weight:bold;">
+                    🔎 搜索学生
+                </button>
+            </div>
+
+            <div style="font-size:0.85rem; color:#718096; margin-bottom:0.4rem;">
+                共检索出 <strong id="user-count-badge" style="color:var(--primary);">0</strong> 名注册学生
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>学号 / 账号</th>
+                        <th>真实姓名</th>
+                        <th>角色身份</th>
+                        <th>未到违约次数</th>
+                        <th>预约资格状态</th>
+                        <th>注册时间</th>
+                        <th>管理操作</th>
+                    </tr>
+                </thead>
+                <tbody id="users-tbody"></tbody>
+            </table>
+        </div>
+
+        <!-- 4. AI 视觉巡查 Tab (管理员专属) -->
+        <div id="tab-ai" class="tab-panel" style="display:none;">
+            <div class="ai-monitor-container">
+                <div>
+                    <h3 style="margin-top:0;">📹 摄像头视觉巡检</h3>
+                    <p style="font-size:0.85rem; color:#718096;">利用 TensorFlow.js COCO-SSD 模型实时识别人体 (Person)，比对空座实际入座情况。</p>
+                    
+                    <div class="video-box">
+                        <video id="webcam" autoplay muted playsinline width="360" height="270" style="border-radius:6px;"></video>
+                        <canvas id="overlay" width="360" height="270" style="position:absolute; top:0; left:0;"></canvas>
+                    </div>
+
+                    <div style="margin-top:0.8rem; display:flex; gap:0.6rem;">
+                        <button id="start-camera-btn" style="background:#28a745; color:white; border:none; padding:0.5rem 1.2rem; border-radius:6px; cursor:pointer; font-weight:bold;">
+                            ▶️ 开启摄像头巡检
+                        </button>
+                        <button id="stop-camera-btn" style="background:#6c757d; color:white; border:none; padding:0.5rem 1rem; border-radius:6px; cursor:pointer;">
+                            ⏹️ 关闭巡视
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="margin-top:0;">🤖 实时视觉分析日志</h3>
+                    <div style="background:#f8f9fa; border:1px solid #e2e8f0; border-radius:6px; padding:1rem; height:270px; overflow-y:auto; font-family:monospace; font-size:0.85rem;" id="ai-log">
+                        <div>[AI系统就绪] 等待开启摄像头...</div>
+                    </div>
+                    <div style="margin-top:0.8rem; font-size:0.88rem; color:#4a5568;">
+                        当前检测状态：<strong id="ai-status" style="color:var(--primary);">待机</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>智座星野 - 图书馆座位预约服务</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <style>
+        .violation-banner {
+            display: none;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.8rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            line-height: 1.4;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .violation-warning {
+            background: #fff8e1;
+            border: 1px solid #ffe082;
+            color: #8d6e63;
+        }
+        .violation-danger {
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+            color: #c62828;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部状态栏（彻底移除学生端 AI 监控入口） -->
+    <header>
+        <div class="header-inner">
+            <h1 class="header-title">智座星野 · 图书馆座位预约</h1>
+            <div class="header-user">
+                <span>👋 <strong id="welcome-name">同学</strong></span>
+                <a href="javascript:void(0)" id="logout-btn">退出登录</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 页面主体容器 -->
+    <div class="container">
+
+        <!-- 违规警告横幅 (15分钟未到违规警示) -->
+        <div id="violation-banner" class="violation-banner">
+            <span id="violation-text"></span>
+        </div>
+
+        <!-- 💻 电脑端专属顶部 Tab 导航（手机端自动隐藏） -->
+        <nav class="desktop-tabs">
+            <button class="desktop-tab-btn active" id="desk-tab-book">🏢 分区选座与预约</button>
+            <button class="desktop-tab-btn" id="desk-tab-schedule">🗓️ 座位时段动态一览</button>
+            <button class="desktop-tab-btn" id="desk-tab-mine">📋 我的预约管理</button>
+        </nav>
+
+        <!-- ==================== Tab 1: 选座预约 ==================== -->
+        <div id="tab-book" class="tab-panel" style="display:block;">
+            
+            <div class="mobile-card">
+                <div class="desktop-form-layout">
+                    <div class="form-group-mobile">
+                        <label>📅 入座开始时间</label>
+                        <input type="datetime-local" id="start-time" class="form-control-mobile" />
+                    </div>
+                    <div class="form-group-mobile">
+                        <label>⏱️ 使用时长</label>
+                        <select id="duration" class="form-control-mobile">
+                            <option value="30">30 分钟</option>
+                            <option value="60" selected>1 小时 (60分钟)</option>
+                            <option value="120">2 小时 (120分钟)</option>
+                            <option value="180">3 小时 (180分钟)</option>
+                            <option value="240">4 小时 (240分钟)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button id="fetch-seats" style="background:var(--primary); color:white; border:none; padding:0.65rem 1.6rem; border-radius:6px; font-weight:bold; font-size:0.95rem; cursor:pointer; height:40px; white-space:nowrap; width:100%;">
+                            🔍 刷新各区实时空座
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 楼层选择滑轨 -->
+            <div class="horizontal-scroll-bar" id="book-floor-bar">
+                <button class="floor-pill active" data-floor="">全部楼层</button>
+                <button class="floor-pill" data-floor="2">2F 自修/考研区</button>
+                <button class="floor-pill" data-floor="3">3F 靠窗/研讨区</button>
+                <button class="floor-pill" data-floor="4">4F 特藏研修区</button>
+            </div>
+
+            <!-- 手机端折叠总控（仅手机有效，电脑端全展平） -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin:0.4rem 0 0.8rem 0; padding:0 0.2rem;" class="mobile-only-tip">
+                <span style="font-size:0.8rem; color:#718096;">💡 手机端点击分区标题可自由收起/展开</span>
+                <button id="toggle-all-zones-btn" style="border:1px solid #cbd5e0; background:#fff; padding:0.25rem 0.65rem; border-radius:12px; font-size:0.75rem; color:#4a5568;">
+                    折叠全部
+                </button>
+            </div>
+
+            <!-- 分区卡片与座位网格容器（电脑端双列并排展示，手机端紧凑手风琴） -->
+            <div id="zones-container">
+                <p style="text-align:center; color:#999; padding:2rem 0;">正在加载楼层与各分区座位...</p>
+            </div>
+
+            <!-- 💻 电脑端常驻预约确认条 -->
+            <div class="desktop-action-bar" id="desktop-action-bar">
+                <div>
+                    <span style="color:#4a5568; font-size:0.95rem;">当前选中座位：</span>
+                    <strong id="desk-selected-seat-name" style="color:var(--primary); font-size:1.15rem; margin-left:6px;">尚未选择（请点击上方绿色空闲座位）</strong>
+                </div>
+                <div>
+                    <button class="btn-book-submit" id="desk-reserve-btn" style="font-size:1.05rem; padding:0.65rem 2.2rem;">
+                        ✅ 确认预定该座位
+                    </button>
+                </div>
+            </div>
+
+            <p id="msg" style="font-weight:bold; text-align:center; margin:1rem 0; min-height:1.2rem;"></p>
+        </div>
+
+        <!-- ==================== Tab 2: 时段动态看板 ==================== -->
+        <div id="tab-schedule" class="tab-panel" style="display:none;">
+            <div class="mobile-card" style="padding:0.8rem 1rem;">
+                <div style="display:flex; gap:0.8rem; align-items:center; flex-wrap:wrap;">
+                    <label style="font-weight:bold; font-size:0.92rem;">📅 选择查看日期：</label>
+                    <input type="date" id="schedule-date" class="form-control-mobile" style="max-width:200px;" />
+                    <button id="load-schedule-btn" style="background:var(--primary); color:white; border:none; padding:0.55rem 1.4rem; border-radius:6px; font-weight:bold; font-size:0.9rem; cursor:pointer;">
+                        📊 刷新时刻表
+                    </button>
+                </div>
+            </div>
+
+            <div class="horizontal-scroll-bar" id="sched-floor-bar">
+                <button class="floor-pill sched-pill active" data-floor="">全馆总览</button>
+                <button class="floor-pill sched-pill" data-floor="2">2F 楼层</button>
+                <button class="floor-pill sched-pill" data-floor="3">3F 楼层</button>
+                <button class="floor-pill sched-pill" data-floor="4">4F 楼层</button>
+            </div>
+
+            <div style="background:#e8f4fd; color:#0c5460; padding:8px 12px; border-radius:6px; font-size:0.85rem; margin-bottom:0.8rem; display:flex; justify-content:space-between; align-items:center;">
+                <span>🟢 绿色：空闲时段（点击可快速选中并跳转预约）&nbsp;|&nbsp; 🔴 红色：已占用</span>
+                <span>💡 已智能为您过滤当天已过去的时段</span>
+            </div>
+
+            <div id="schedule-wrapper">
+                <p style="text-align:center; color:#999; padding:2rem 0;">正在渲染时段分布图表...</p>
+            </div>
+        </div>
+
+        <!-- ==================== Tab 3: 我的预约 ==================== -->
+        <div id="tab-mine" class="tab-panel" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3 style="margin:0; font-size:1.15rem; color:#2d3748;">📋 我的预约清单与状态</h3>
+                <button id="refresh-mine" style="border:1px solid #cbd5e0; background:#fff; padding:0.4rem 1rem; border-radius:15px; font-size:0.85rem; cursor:pointer;">
+                    🔄 刷新数据
+                </button>
+            </div>
+
+            <div id="my-reservations-wrap">
+                <p style="text-align:center; color:#999; padding:2rem 0;">正在加载您的预约记录...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 📱 手机端底部浮动吸底确认条 -->
+    <div class="mobile-bottom-action-bar" id="floating-action-bar" style="display:none;">
+        <div>
+            <div style="font-size:0.75rem; color:#718096;">已选座位</div>
+            <div id="selected-seat-name" style="font-weight:bold; color:var(--primary); font-size:0.95rem;">--</div>
+        </div>
+        <button class="btn-book-submit" id="reserve-btn">
+            ✅ 立即预定
+        </button>
+    </div>
+
+    <!-- 📱 移动端底部导航栏 (TabBar) -->
+    <nav class="mobile-tab-bar">
+        <a class="tab-bar-item active" id="nav-book">
+            <span class="tab-icon">🏢</span>
+            <span>选座预约</span>
+        </a>
+        <a class="tab-bar-item" id="nav-schedule">
+            <span class="tab-icon">🗓️</span>
+            <span>时段看板</span>
+        </a>
+        <a class="tab-bar-item" id="nav-mine">
+            <span class="tab-icon">📋</span>
+            <span>我的预约</span>
+        </a>
+    </nav>
+
+    <script src="/static/user.js"></script>
+</body>
+</html>

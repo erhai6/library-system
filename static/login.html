@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>智座星野 - 登录</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <style>
+        .auth-container {
+            max-width: 420px;
+            margin: 2.5rem auto 1rem;
+            padding: 0 1rem;
+        }
+        .auth-card {
+            background: white;
+            padding: 1.8rem 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        .auth-title {
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+        }
+        .btn-auth {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: 1.2rem;
+            font-size: 0.88rem;
+            color: #718096;
+        }
+        .auth-footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body style="padding-bottom: 20px;">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-title">📚 智座星野 · 图书馆服务</div>
+            
+            <div class="form-group-mobile">
+                <label>学号 / 用户名</label>
+                <input type="text" id="username" class="form-control-mobile" placeholder="请输入学号或账号" autocomplete="username" />
+            </div>
+
+            <div class="form-group-mobile">
+                <label>密码</label>
+                <input type="password" id="password" class="form-control-mobile" placeholder="请输入密码" autocomplete="current-password" />
+            </div>
+
+            <button class="btn-auth" id="login-btn">🔑 立即登录</button>
+            <p id="msg" style="text-align:center; min-height:1.2rem; font-size:0.85rem; margin-top:0.8rem;"></p>
+            
+            <div class="auth-footer">
+                还没有账号？<a href="/register">注册新学生账号</a>
+            </div>
+        </div>
+    </div>
+    <script src="/static/login.js"></script>
+</body>
+</html>
