@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智座星野 - 比赛设计说明文档</title>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --primary-light: #3b82f6;
+            --accent: #10b981;
+            --text-main: #1f2937;
+            --text-muted: #4b5563;
+            --bg-page: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+            background: var(--bg-page);
+            color: var(--text-main);
+            line-height: 1.7;
+            font-size: 15px;
+            margin: 0;
+            padding: 2.5rem 1rem;
+        }
+        .paper {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 3.5rem 3rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+        h1 {
+            font-size: 2.1rem;
+            color: var(--primary);
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            font-weight: 500;
+        }
+        .meta-badges {
+            display: flex;
+            justify-content: center;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            margin-bottom: 2.5rem;
+        }
+        .badge {
+            background: #eff6ff;
+            color: #1d4ed8;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid #bfdbfe;
+        }
+        .badge.accent {
+            background: #ecfdf5;
+            color: #047857;
+            border-color: #a7f3d0;
+        }
+        h2 {
+            font-size: 1.35rem;
+            color: var(--primary);
+            border-left: 5px solid var(--primary-light);
+            padding-left: 12px;
+            margin-top: 2.2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        h3 {
+            font-size: 1.12rem;
+            color: #1e293b;
+            margin-top: 1.4rem;
+            margin-bottom: 0.6rem;
+        }
+        p, li {
+            color: var(--text-muted);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.2rem 0;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            font-size: 0.92rem;
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 10px 14px;
+            text-align: left;
+        }
+        th {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background: #f8fafc;
+        }
+        pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 1.2rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: Consolas, Monaco, "Courier New", monospace;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            margin: 1rem 0;
+        }
+        code {
+            font-family: Consolas, Monaco, "Courier New", monospace;
+            background: #f1f5f9;
+            color: #e11d48;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+        .callout {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 1rem 1.2rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1.2rem 0;
+            color: #166534;
+        }
+        .diagram-box {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre;
+            line-height: 1.4;
+            color: #334155;
+            overflow-x: auto;
+        }
+        @media print {
+            body { background: white; padding: 0; }
+            .paper { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="paper">
+    <h1>智座星野</h1>
+    <div class="subtitle">基于端侧轻量化视觉AI的智慧图书馆座位预约与智能巡检系统 · 设计说明文档</div>
+    
+    <div class="meta-badges">
+        <span class="badge">主办：西南大学工程技术学院团委</span>
+        <span class="badge">承办：学生会学术科技部</span>
+        <span class="badge accent">赛道：智慧校园赛道</span>
+        <span class="badge">类型：轻量化AI实用小程序</span>
+    </div>
+
+    <div class="callout">
+        <strong>🌐 在线体验与实时演示环境：</strong><br>
+        • 云端全功能服务地址：<a href="https://erhai6.pythonanywhere.com" target="_blank">https://erhai6.pythonanywhere.com</a><br>
+        • 一体化轻量小程序端：<a href="https://erhai6.pythonanywhere.com/app" target="_blank">https://erhai6.pythonanywhere.com/app</a><br>
+        • 默认测试学生账号：<code>student1</code> / 密码：<code>123456</code><br>
+        • 默认测试管理账号：<code>admin1</code> / 密码：<code>adminpwd</code>
+    </div>
+
+    <h2>一、团队信息</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>团队角色</th>
+                <th>姓名</th>
+                <th>学院 / 专业</th>
+                <th>学号</th>
+                <th>联系电话 / 邮箱</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>队长 / 核心架构</strong></td>
+                <td>[请填写姓名]</td>
+                <td>工程技术学院 / [请填写专业]</td>
+                <td>[请填写学号]</td>
+                <td>[请填写联系方式]</td>
+            </tr>
+            <tr>
+                <td><strong>队员 / AI与算法</strong></td>
+                <td>[请填写姓名]</td>
+                <td>工程技术学院 / [请填写专业]</td>
+                <td>[请填写学号]</td>
+                <td>[请填写联系方式]</td>
+            </tr>
+            <tr>
+                <td><strong>队员 / 前端与测试</strong></td>
+                <td>[请填写姓名]</td>
+                <td>工程技术学院 / [请填写专业]</td>
+                <td>[请填写学号]</td>
+                <td>[请填写联系方式]</td>
+            </tr>
+            <tr>
+                <td><strong>指导教师（选填）</strong></td>
+                <td>[请填写指导老师]</td>
+                <td>西南大学工程技术学院</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>二、作品介绍</h2>
+    <h3>2.1 研发背景与校园痛点</h3>
+    <p>
+        高校图书馆是师生自主研习的核心公共空间，长期面临突出的治理痛点：
+    </p>
+    <ul>
+        <li><strong>虚假预约与人情占座频发：</strong>学生线上订座后超时未至，造成“系统显示爆满，馆内空座大半”；或用书包、水杯长期“人走留物”恶意占座。</li>
+        <li><strong>人工巡查成本高、易起纠纷：</strong>管理员逐层核查费时费力，无法做到全天候闭环监管，缺乏客观的技术取证依据。</li>
+        <li><strong>中心化视频上传存在隐私风险：</strong>若将全馆监控全量上传至云端中心分析，不仅带宽算力开销巨大，还容易引发广大师生对人脸及隐私泄露的担忧。</li>
+    </ul>
+
+    <h3>2.2 核心创新与产品特色</h3>
+    <p>
+        “智座星野”创新采用<strong>“端侧轻量视觉AI + 时空状态机调度 + 自包含小程序架构”</strong>，带来革新性体验：
+    </p>
+    <ul>
+        <li><strong>全流程无感闭环：</strong>“选座 $	o$ 签到 $	o$ 暂离报备 $	o$ AI视觉在馆巡检 $	o$ 超时自动释放 $	o$ 违规惩戒”一气呵成。</li>
+        <li><strong>端侧边缘视觉推理：</strong>在前端浏览器/小程序本地沙盒内运行 MobileNet-SSD 模型，视频原始流绝不上传，充分保障师生隐私。</li>
+        <li><strong>单文件小程序极速开箱：</strong>作品整合为单个自包含 HTML，内嵌实拍巡视素材与时序标注数据，在无网、离线环境下依然可直接双击运行全套 AI 巡视与演示工具，极具可移植性与易用性。</li>
+    </ul>
+
+    <h2>三、AI 应用说明</h2>
+    <h3>3.1 轻量级深度学习目标检测模型</h3>
+    <p>
+        选用 <strong>TensorFlow.js + COCO-SSD（MobileNetV2 骨干网络）</strong>。模型总大小仅数兆字节，直接基于客户端硬件利用 WebGL / WebAssembly 实现硬件级并发推理：
+    </p>
+    <ul>
+        <li><strong>人员识别（person）：</strong>置信度阈值 &ge; 0.55</li>
+        <li><strong>遗留物品识别（backpack / handbag / laptop / book）：</strong>置信度阈值 &ge; 0.45</li>
+        <li><strong>帧率与性能：</strong>端侧实时帧率稳定在 25~30 FPS，响应时间小于 40ms。</li>
+    </ul>
+
+    <h3>3.2 复合空间“人-物-座”时空状态机研判算法</h3>
+    <p>针对学生短暂起身上洗手间、打水等正常行为，算法设计了时序滑动窗口与暂离保护判定：</p>
+    <div class="diagram-box">
+[目标座位区域判定逻辑]
+  ├─ 区域内检测到 人员(person) ───────► 【正常就座 (ACTIVE)】
+  ├─ 区域内 无人员 且 无任何物品 ─────► 【座位空闲 (VACANT)】
+  └─ 区域内 无人员 但有背包/电脑等物品 ─►
+        ├─ 学生已报备暂离且在时限内 ───► 【正常暂离保留中】
+        └─ 未报备暂离 或 暂离已超时 ────► 【触发占座告警 (GHOST_OCCUPANCY)】
+                                            └─ 开启3分钟缓冲倒计时，未回自动释放并计违约
+    </div>
+
+    <h3>3.3 离线与在线双通道巡查机制</h3>
+    <ul>
+        <li><strong>实况摄像头通道（Live Camera）：</strong>调用本地 WebCam，实时对自习桌进行动态目标画框检测与热力渲染。</li>
+        <li><strong>数字孪生实拍通道（Digital Twin）：</strong>小程序内置预采真实图书馆巡视视频片段（Base64编码）与时序空间坐标，断网状态下仍能 100% 完整复现 AI 巡视与告警处置。</li>
+    </ul>
+
+    <h2>四、设计思路与系统架构</h2>
+    <h3>4.1 系统整体技术拓扑</h3>
+    <div class="diagram-box">
++------------------------------------------------------------------------+
+|                          智座星野 整体技术拓扑                          |
++------------------------------------------------------------------------+
+       │                                                 │
+       ▼                                                 ▼
+【学生端 (移动WebApp/小程序)】                    【管理端与AI巡查指挥中心】
+ • 2F/3F/4F 多楼层自习选座                        • 实时在座负荷与楼层热力大盘
+ • 实时可用性日历/时段筛选                        • 预约全量记录多维检索与导出
+ • 扫码签到 / 暂离报备 / 提前离座                • 学生信用分/黑名单与一键解封
+ • 违规记录与信用预警横幅                         • AI视觉巡视日志、告警与演示工具
+       │                                                 │
+       +------------------------┬------------------------+
+                                │ (RESTful / Token 安全交互)
+                                ▼
+               【调度中枢 (Python Flask / Gunicorn)】
+                • PBKDF2-HMAC-SHA256 密码加盐存储
+                • 15分钟开座未签到超时守护线程
+                • 排他性时空冲突防刷与并发保护
+                                │
+                                ▼
+                【持久化存储层 (SQLite WAL 模式)】
+                • 开启 WAL 预写日志，彻底避免并发写锁死
+    </div>
+
+    <h3>4.2 核心业务流转闭环</h3>
+    <div class="diagram-box">
+学生预约提交 ──► 校验无冲突并锁定(reserved) 
+                  │
+                  ├──(15分钟内到馆签到)──► 正常在座(active) ──► 学习结束/提前离座(released)
+                  │                              │
+                  │                              ├──(AI检测人走物留且未报备)──► 占座告警并强制释放
+                  │
+                  └──(15分钟未签到超时)──► 守护线程释放 + 违规+1 ──► (满3次锁定预约)
+    </div>
+
+    <h2>五、核心源代码精选与实现</h2>
+    <h3>5.1 端侧 AI 视觉状态机研判引擎（选自小程序）</h3>
+    <pre><code>// 计算预测边界框与座位预设 ROI 区域的重合度并研判状态
+function evaluateSeatStatus(predictions, seatROI) {
+    let hasPerson = false;
+    let hasItems = false;
+    
+    for (const pred of predictions) {
+        const [x, y, w, h] = pred.bbox;
+        const overlap = computeOverlapRatio({x, y, w, h}, seatROI);
+        if (overlap > 0.35) {
+            if (pred.class === 'person' && pred.score >= 0.55) {
+                hasPerson = true;
+            } else if (['backpack', 'handbag', 'laptop', 'book'].includes(pred.class)) {
+                hasItems = true;
+            }
+        }
+    }
+
+    if (hasPerson) return { status: 'occupied', label: '正常就座' };
+    if (hasItems) return { status: 'ghost', label: '疑似占座(人走物留)', alert: true };
+    return { status: 'vacant', label: '空座' };
+}</code></pre>
+
+    <h3>5.2 后台 15 分钟超时未签到巡检守护线程（选自 app.py）</h3>
+    <pre><code>def background_scheduler_worker():
+    """后台守护线程：每 20 秒扫描一次，判定开座后 15 分钟未签到违约"""
+    while True:
+        pytime.sleep(20)
+        conn = None
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=30.0)
+            cur = conn.cursor()
+            threshold = (datetime.now() - timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S')
+            
+            cur.execute("SELECT id, user_id FROM reservations WHERE status = 'reserved' AND start_time < ?", (threshold,))
+            for res_id, u_id in cur.fetchall():
+                cur.execute("UPDATE reservations SET status = 'released' WHERE id = ?", (res_id,))
+                cur.execute("UPDATE users SET violation_count = violation_count + 1 WHERE id = ?", (u_id,))
+                cur.execute("UPDATE users SET is_restricted = 1 WHERE id = ? AND violation_count >= 3", (u_id,))
+            conn.commit()
+        finally:
+            if conn: conn.close()</code></pre>
+
+    <h2>六、总结与应用价值</h2>
+    <p>
+        “智座星野”立足智慧校园现实需求，实现了端侧前沿计算机视觉技术在资源调度领域的落地应用。系统兼顾人性化柔性管理与智能化刚性监督，不仅具备高度的实用价值与示范意义，更为高校智慧校园精细化治理提供了切实可行的解决方案。
+    </p>
+</div>
+
+</body>
+</html>

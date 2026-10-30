@@ -143,6 +143,31 @@ def init_db():
     cur.execute('CREATE INDEX IF NOT EXISTS idx_res_user ON reservations(user_id, status)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_tokens_lookup ON tokens(token, expires_at)')
 
+    # 6. 学习时长与签到签退字段动态迁移
+    cur.execute("PRAGMA table_info(reservations)")
+    r_cols = [col[1] for col in cur.fetchall()]
+    if 'checkin_time' not in r_cols:
+        cur.execute("ALTER TABLE reservations ADD COLUMN checkin_time TEXT")
+    if 'checkout_time' not in r_cols:
+        cur.execute("ALTER TABLE reservations ADD COLUMN checkout_time TEXT")
+    if 'actual_minutes' not in r_cols:
+        cur.execute("ALTER TABLE reservations ADD COLUMN actual_minutes INTEGER DEFAULT 0")
+    if 'ai_flag' not in r_cols:
+        cur.execute("ALTER TABLE reservations ADD COLUMN ai_flag TEXT")
+
+    # 对已有 released 历史记录平滑初始化学习时长 (按预约时长作为有效学时)
+    cur.execute('''
+        UPDATE reservations
+        SET checkin_time = COALESCE(checkin_time, start_time),
+            checkout_time = COALESCE(checkout_time, end_time),
+            actual_minutes = CASE 
+                WHEN actual_minutes IS NOT NULL AND actual_minutes > 0 THEN actual_minutes
+                WHEN status = 'released' THEN MAX(10, CAST((strftime('%s', end_time) - strftime('%s', start_time)) / 60 AS INTEGER))
+                ELSE 0
+            END
+        WHERE actual_minutes IS NULL OR actual_minutes = 0
+    ''')
+
     # 默认预设管理员与学生账号
     cur.execute("SELECT password FROM users WHERE username='admin1'")
     if not cur.fetchone():
@@ -194,11 +219,31 @@ def background_scheduler_worker():
             now = datetime.now()
             now_str = now.strftime('%Y-%m-%d %H:%M:%S')
 
-            # 1. 到期正常结座
+            # 1. 到期正常结座 (已签到 active 的到期结座并记录实际学习时长)
+            cur.execute('''
+                SELECT id, checkin_time, start_time, end_time FROM reservations
+                WHERE end_time <= ? AND status = 'active'
+            ''', (now_str,))
+            active_expired = [dict(r) for r in cur.fetchall()]
+            for r in active_expired:
+                ref_time = r['checkin_time'] or r['start_time']
+                try:
+                    c_dt = datetime.strptime(ref_time, '%Y-%m-%d %H:%M:%S')
+                    e_dt = datetime.strptime(r['end_time'], '%Y-%m-%d %H:%M:%S')
+                    dur_min = max(1, int((e_dt - c_dt).total_seconds() / 60))
+                except Exception:
+                    dur_min = 30
+                cur.execute('''
+                    UPDATE reservations
+                    SET status = 'released', checkout_time = ?, actual_minutes = ?
+                    WHERE id = ?
+                ''', (r['end_time'], dur_min, r['id']))
+
+            # 对于从未签到且已过结束时间的 reserved 预约，自动标记为超时释放
             cur.execute('''
                 UPDATE reservations
-                SET status = 'released'
-                WHERE end_time <= ? AND status IN ('reserved', 'active')
+                SET status = 'timeout_released', actual_minutes = 0
+                WHERE end_time <= ? AND status = 'reserved'
             ''', (now_str,))
 
             # 2. 签到超时判定（15 分钟未签到）
@@ -692,7 +737,7 @@ def my_reservations():
     db  = get_db()
     cur = db.cursor()
     cur.execute('''
-        SELECT id, seat_id, user_name, start_time, end_time, status
+        SELECT id, seat_id, user_name, start_time, end_time, checkin_time, checkout_time, actual_minutes, status
         FROM reservations
         WHERE user_id = ? OR (user_id IS NULL AND user_name = ?)
         ORDER BY start_time DESC
@@ -722,14 +767,15 @@ def cancel_reservation():
     if res['status'] == 'released':
         return jsonify({'error': '该预约已处于释放状态'}), 400
 
-    cur.execute("UPDATE reservations SET status = 'released' WHERE id = ?", (res_id,))
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cur.execute("UPDATE reservations SET status = 'released', checkout_time = ?, actual_minutes = 0 WHERE id = ?", (now_str, res_id))
     db.commit()
     return jsonify({'status': 'released', 'message': '预约已成功取消'})
 
 @app.route('/api/checkin', methods=['POST'])
 @login_required
 def checkin():
-    """签到入座（状态变为 active）"""
+    """签到入座（状态变为 active，并记录打卡入座时间）"""
     data   = request.json or {}
     res_id = data.get('id')
     if not res_id:
@@ -748,14 +794,15 @@ def checkin():
     if res['status'] != 'reserved':
         return jsonify({'error': f"当前状态不可签到: {res['status']}"}), 400
 
-    cur.execute("UPDATE reservations SET status = 'active' WHERE id = ?", (res_id,))
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cur.execute("UPDATE reservations SET status = 'active', checkin_time = ? WHERE id = ?", (now_str, res_id))
     db.commit()
     return jsonify({'status': 'active', 'message': '签到成功，已进入使用状态'})
 
 @app.route('/api/release-self', methods=['POST'])
 @login_required
 def release_self():
-    """临时有事提前释放座位"""
+    """临时有事提前释放座位（若已入座自习，自动准确结算实际学习时长）"""
     data   = request.json or {}
     res_id = data.get('id')
     if not res_id:
@@ -774,9 +821,394 @@ def release_self():
     if res['status'] == 'released':
         return jsonify({'error': '座位已处于释放状态'}), 400
 
-    cur.execute("UPDATE reservations SET status = 'released' WHERE id = ?", (res_id,))
+    now_dt = datetime.now()
+    now_str = now_dt.strftime('%Y-%m-%d %H:%M:%S')
+
+    if res['status'] == 'active':
+        ref_time = res['checkin_time'] or res['start_time']
+        try:
+            c_dt = datetime.strptime(ref_time, '%Y-%m-%d %H:%M:%S')
+            duration_min = max(1, int((now_dt - c_dt).total_seconds() / 60))
+        except Exception:
+            duration_min = 1
+        cur.execute('''
+            UPDATE reservations
+            SET status = 'released', checkout_time = ?, actual_minutes = ?
+            WHERE id = ?
+        ''', (now_str, duration_min, res_id))
+    else:
+        cur.execute("UPDATE reservations SET status = 'released', checkout_time = ?, actual_minutes = 0 WHERE id = ?", (now_str, res_id))
+
     db.commit()
     return jsonify({'status': 'released', 'message': '座位已成功释放'})
+
+# ==================== 学习时长排行榜与学情统计 API ====================
+def get_study_level_info(total_minutes: int):
+    """根据学习总时长计算学霸等级与称号"""
+    hours = round(total_minutes / 60.0, 1)
+    levels = [
+        {'level': 1, 'title': '初入书林', 'min_h': 0, 'max_h': 5, 'badge': '🌱 新苗'},
+        {'level': 2, 'title': '笃学尚行', 'min_h': 5, 'max_h': 20, 'badge': '📘 进阶'},
+        {'level': 3, 'title': '敏而好学', 'min_h': 20, 'max_h': 50, 'badge': '⭐ 达人'},
+        {'level': 4, 'title': '自律学神', 'min_h': 50, 'max_h': 100, 'badge': '🔥 学霸'},
+        {'level': 5, 'title': '馆藏博导', 'min_h': 100, 'max_h': 200, 'badge': '🏅 博导'},
+        {'level': 6, 'title': '研读宗师', 'min_h': 200, 'max_h': 999999, 'badge': '👑 宗师'}
+    ]
+    current = levels[0]
+    next_level = levels[1]
+    for i, lv in enumerate(levels):
+        if hours >= lv['min_h']:
+            current = lv
+            next_level = levels[i+1] if i + 1 < len(levels) else None
+        else:
+            break
+
+    if next_level:
+        needed_h = max(0.0, round(next_level['min_h'] - hours, 1))
+        span = next_level['min_h'] - current['min_h']
+        progress = int(((hours - current['min_h']) / span) * 100) if span > 0 else 0
+        progress = max(0, min(100, progress))
+    else:
+        needed_h = 0.0
+        progress = 100
+
+    return {
+        'level': current['level'],
+        'title': current['title'],
+        'badge': current['badge'],
+        'hours': hours,
+        'total_minutes': total_minutes,
+        'next_title': next_level['title'] if next_level else '已达最高宗师段位',
+        'needed_hours': needed_h,
+        'progress': progress
+    }
+
+def format_minutes_human(minutes: int) -> str:
+    """格式化学习时长为更友好的自然语言"""
+    if not minutes or minutes <= 0:
+        return '0分钟'
+    h = minutes // 60
+    m = minutes % 60
+    if h > 0 and m > 0:
+        return f"{h}小时{m}分"
+    elif h > 0:
+        return f"{h}小时"
+    else:
+        return f"{m}分钟"
+
+@app.route('/api/leaderboard', methods=['GET'])
+@login_required
+def get_leaderboard():
+    """
+    学习时长排行榜接口：
+    支持参数: type = 'daily' (日榜) | 'weekly' (周榜) | 'monthly' (月榜) | 'total' (总榜)
+    特性：
+    1. 上榜名字默认使用学生的自定义昵称；
+    2. 实时将正在在座（active）学生的当前自习时长动态累加；
+    3. 返回榜单排行、荣誉称号、自习次数，以及当前登录用户的专属名次。
+    """
+    lb_type = request.args.get('type', 'daily').strip().lower()
+    now = datetime.now()
+    
+    start_dt_str = None
+    end_dt_str = None
+    
+    if lb_type == 'daily':
+        start_dt_str = now.strftime('%Y-%m-%d 00:00:00')
+        end_dt_str = now.strftime('%Y-%m-%d 23:59:59')
+    elif lb_type == 'weekly':
+        monday = now - timedelta(days=now.weekday())
+        sunday = monday + timedelta(days=6)
+        start_dt_str = monday.strftime('%Y-%m-%d 00:00:00')
+        end_dt_str = sunday.strftime('%Y-%m-%d 23:59:59')
+    elif lb_type == 'monthly':
+        import calendar
+        _, last_day = calendar.monthrange(now.year, now.month)
+        start_dt_str = now.strftime('%Y-%m-01 00:00:00')
+        end_dt_str = now.strftime(f'%Y-%m-{last_day:02d} 23:59:59')
+    else:
+        lb_type = 'total'
+
+    db = get_db()
+    cur = db.cursor()
+
+    sql = '''
+        SELECT r.id, r.user_id, r.user_name, r.status, r.start_time, r.end_time,
+               r.checkin_time, r.checkout_time, r.actual_minutes,
+               u.username, u.nickname
+        FROM reservations r
+        LEFT JOIN users u ON r.user_id = u.id
+        WHERE r.status IN ('released', 'active')
+    '''
+    params = []
+    if start_dt_str and end_dt_str:
+        sql += ' AND ((r.start_time >= ? AND r.start_time <= ?) OR (r.checkin_time >= ? AND r.checkin_time <= ?))'
+        params.extend([start_dt_str, end_dt_str, start_dt_str, end_dt_str])
+
+    cur.execute(sql, params)
+    rows = cur.fetchall()
+
+    user_stats = {}
+    for r in rows:
+        uid = r['user_id']
+        uname = r['username'] or r['user_name']
+        nickname = r['nickname'] or r['user_name'] or uname
+        key = str(uid) if uid else f"name_{uname}"
+
+        if key not in user_stats:
+            user_stats[key] = {
+                'user_id': uid,
+                'username': uname,
+                'nickname': nickname,
+                'total_minutes': 0,
+                'sessions': 0,
+                'is_active': False
+            }
+
+        m = 0
+        if r['status'] == 'released':
+            m = r['actual_minutes'] or 0
+        elif r['status'] == 'active':
+            user_stats[key]['is_active'] = True
+            ref_str = r['checkin_time'] or r['start_time']
+            try:
+                c_dt = datetime.strptime(ref_str, '%Y-%m-%d %H:%M:%S')
+                m = max(1, int((now - c_dt).total_seconds() / 60))
+            except Exception:
+                m = 15
+
+        if m > 0:
+            user_stats[key]['total_minutes'] += m
+            user_stats[key]['sessions'] += 1
+
+    ranking_list = list(user_stats.values())
+    ranking_list.sort(key=lambda x: (x['total_minutes'], x['sessions']), reverse=True)
+
+    current_uid = g.current_user['user_id']
+    current_uname = g.current_user['username']
+    my_rank_info = None
+
+    result_items = []
+    for idx, item in enumerate(ranking_list):
+        rank = idx + 1
+        level_data = get_study_level_info(item['total_minutes'])
+        formatted_time = format_minutes_human(item['total_minutes'])
+
+        entry = {
+            'rank': rank,
+            'user_id': item['user_id'],
+            'nickname': item['nickname'],
+            'username': item['username'],
+            'total_minutes': item['total_minutes'],
+            'formatted_time': formatted_time,
+            'sessions': item['sessions'],
+            'is_active': item['is_active'],
+            'level': level_data['level'],
+            'title': level_data['title'],
+            'badge': level_data['badge']
+        }
+        result_items.append(entry)
+
+        if (item['user_id'] and item['user_id'] == current_uid) or (item['username'] == current_uname):
+            my_rank_info = {
+                'rank': rank,
+                'total_minutes': item['total_minutes'],
+                'formatted_time': formatted_time,
+                'sessions': item['sessions'],
+                'nickname': item['nickname'],
+                'title': level_data['title'],
+                'badge': level_data['badge'],
+                'is_active': item['is_active']
+            }
+
+    if not my_rank_info:
+        cur.execute('SELECT nickname, username FROM users WHERE id = ?', (current_uid,))
+        u_info = cur.fetchone()
+        nick = (u_info['nickname'] if u_info else '') or g.current_user.get('nickname') or current_uname
+        my_rank_info = {
+            'rank': '暂未上榜',
+            'total_minutes': 0,
+            'formatted_time': '0分钟',
+            'sessions': 0,
+            'nickname': nick,
+            'title': '初入书林',
+            'badge': '🌱 新苗',
+            'is_active': False
+        }
+
+    return jsonify({
+        'type': lb_type,
+        'leaderboard': result_items[:50],
+        'my_rank': my_rank_info,
+        'time_range': {
+            'start': start_dt_str,
+            'end': end_dt_str
+        }
+    })
+
+@app.route('/api/user/study-stats', methods=['GET'])
+@login_required
+def user_study_stats():
+    """
+    个人学情档案与自定义时间段学习统计接口：
+    1. 今日、本周、本月、历史总学时
+    2. 当前在座状态与进行中学时
+    3. 自定义开始日期与结束日期学时汇总与每日趋势
+    """
+    user_id = g.current_user['user_id']
+    username = g.current_user['username']
+    start_date_param = request.args.get('start_date', '').strip()
+    end_date_param = request.args.get('end_date', '').strip()
+
+    db = get_db()
+    cur = db.cursor()
+    now = datetime.now()
+
+    cur.execute('''
+        SELECT r.id, r.seat_id, r.start_time, r.end_time, r.checkin_time, r.checkout_time, r.status, r.actual_minutes,
+               s.name as seat_name, s.floor, s.zone
+        FROM reservations r
+        LEFT JOIN seats s ON r.seat_id = s.id
+        WHERE (r.user_id = ? OR (r.user_id IS NULL AND r.user_name = ?))
+          AND r.status IN ('released', 'active')
+        ORDER BY r.start_time DESC
+    ''', (user_id, username))
+    rows = [dict(r) for r in cur.fetchall()]
+
+    today_str = now.strftime('%Y-%m-%d')
+    monday = now - timedelta(days=now.weekday())
+    sunday = monday + timedelta(days=6)
+    week_start_str = monday.strftime('%Y-%m-%d')
+    week_end_str = sunday.strftime('%Y-%m-%d')
+    month_start_str = now.strftime('%Y-%m-01')
+
+    today_min = 0
+    week_min = 0
+    month_min = 0
+    total_min = 0
+    total_sessions = 0
+    active_session = None
+
+    for r in rows:
+        st = r['start_time'][:10]
+        m = 0
+        if r['status'] == 'released':
+            m = r['actual_minutes'] or 0
+        elif r['status'] == 'active':
+            ref_str = r['checkin_time'] or r['start_time']
+            try:
+                c_dt = datetime.strptime(ref_str, '%Y-%m-%d %H:%M:%S')
+                m = max(1, int((now - c_dt).total_seconds() / 60))
+            except Exception:
+                m = 15
+            active_session = {
+                'id': r['id'],
+                'seat_id': r['seat_id'],
+                'seat_name': r.get('seat_name') or f"座位#{r['seat_id']}",
+                'floor': r.get('floor'),
+                'zone': r.get('zone'),
+                'checkin_time': r['checkin_time'] or r['start_time'],
+                'current_minutes': m,
+                'formatted': format_minutes_human(m)
+            }
+
+        if m > 0:
+            total_min += m
+            total_sessions += 1
+            if st == today_str:
+                today_min += m
+            if week_start_str <= st <= week_end_str:
+                week_min += m
+            if st >= month_start_str:
+                month_min += m
+
+    level_info = get_study_level_info(total_min)
+
+    # 自定义时间段查询汇总
+    custom_stats = None
+    if start_date_param and end_date_param:
+        custom_total_min = 0
+        custom_sessions = 0
+        daily_map = {}
+
+        for r in rows:
+            st = r['start_time'][:10]
+            if start_date_param <= st <= end_date_param:
+                m = r['actual_minutes'] or 0
+                if r['status'] == 'active':
+                    ref_str = r['checkin_time'] or r['start_time']
+                    try:
+                        c_dt = datetime.strptime(ref_str, '%Y-%m-%d %H:%M:%S')
+                        m = max(1, int((now - c_dt).total_seconds() / 60))
+                    except Exception:
+                        m = 15
+                if m > 0:
+                    custom_total_min += m
+                    custom_sessions += 1
+                    daily_map[st] = daily_map.get(st, 0) + m
+
+        daily_breakdown = []
+        for d in sorted(daily_map.keys(), reverse=True):
+            daily_breakdown.append({
+                'date': d,
+                'minutes': daily_map[d],
+                'formatted': format_minutes_human(daily_map[d])
+            })
+
+        days_count = len(daily_map)
+        avg_min = int(custom_total_min / days_count) if days_count > 0 else 0
+
+        custom_stats = {
+            'start_date': start_date_param,
+            'end_date': end_date_param,
+            'total_minutes': custom_total_min,
+            'formatted_time': format_minutes_human(custom_total_min),
+            'sessions': custom_sessions,
+            'active_days': days_count,
+            'avg_daily_minutes': avg_min,
+            'avg_daily_formatted': format_minutes_human(avg_min),
+            'daily_breakdown': daily_breakdown
+        }
+
+    return jsonify({
+        'overview': {
+            'today_minutes': today_min,
+            'today_formatted': format_minutes_human(today_min),
+            'week_minutes': week_min,
+            'week_formatted': format_minutes_human(week_min),
+            'month_minutes': month_min,
+            'month_formatted': format_minutes_human(month_min),
+            'total_minutes': total_min,
+            'total_formatted': format_minutes_human(total_min),
+            'total_sessions': total_sessions
+        },
+        'level_info': level_info,
+        'active_session': active_session,
+        'custom_range': custom_stats
+    })
+
+@app.route('/api/user/update-nickname', methods=['POST'])
+@login_required
+def update_nickname():
+    """修改展示昵称（满足排行榜使用个性昵称）"""
+    data = request.json or {}
+    new_nickname = data.get('nickname', '').strip()
+    if not new_nickname:
+        return jsonify({'error': '昵称不能为空'}), 400
+    if len(new_nickname) > 20:
+        return jsonify({'error': '昵称不能超过 20 个字符'}), 400
+
+    user_id = g.current_user['user_id']
+    db = get_db()
+    cur = db.cursor()
+    cur.execute('UPDATE users SET nickname = ? WHERE id = ?', (new_nickname, user_id))
+    cur.execute('UPDATE tokens SET nickname = ? WHERE user_id = ?', (new_nickname, user_id))
+    db.commit()
+    return jsonify({
+        'status': 'ok',
+        'message': '昵称修改成功，排行榜将同步展示您的新昵称！',
+        'nickname': new_nickname
+    })
 
 # ==================== 管理员 API 与统计看板 ====================
 @app.route('/api/admin/reservations', methods=['GET'])
@@ -874,15 +1306,165 @@ def admin_reset_violation():
 def admin_release():
     data = request.json or {}
     reservation_id = data.get('id')
+    reason = data.get('reason', '')
+    is_violation = data.get('is_violation', False)
+
     if not reservation_id:
         return jsonify({'error': 'id required'}), 400
     db  = get_db()
     cur = db.cursor()
-    cur.execute('UPDATE reservations SET status = ? WHERE id = ?', ('released', reservation_id))
-    db.commit()
-    if cur.rowcount == 0:
+    cur.execute('SELECT * FROM reservations WHERE id = ?', (reservation_id,))
+    res = cur.fetchone()
+    if not res:
         return jsonify({'error': '预约记录不存在'}), 404
-    return jsonify({'status': 'released'})
+
+    now_dt = datetime.now()
+    now_str = now_dt.strftime('%Y-%m-%d %H:%M:%S')
+
+    duration_min = 0
+    if res['status'] == 'active':
+        ref_time = res['checkin_time'] or res['start_time']
+        try:
+            c_dt = datetime.strptime(ref_time, '%Y-%m-%d %H:%M:%S')
+            duration_min = max(1, int((now_dt - c_dt).total_seconds() / 60))
+        except Exception:
+            duration_min = 1
+
+    new_status = 'timeout_released' if is_violation else 'released'
+
+    cur.execute('''
+        UPDATE reservations
+        SET status = ?, checkout_time = ?, actual_minutes = ?, ai_flag = ?
+        WHERE id = ?
+    ''', (new_status, now_str, duration_min, reason or None, reservation_id))
+
+    violation_info = None
+    if is_violation and res['user_id']:
+        cur.execute("SELECT violation_count FROM users WHERE id = ?", (res['user_id'],))
+        u = cur.fetchone()
+        if u:
+            new_v_cnt = (u['violation_count'] or 0) + 1
+            restricted = 1 if new_v_cnt >= LIBRARY_CONFIG['max_violation_limit'] else 0
+            cur.execute("UPDATE users SET violation_count = ?, is_restricted = ? WHERE id = ?", (new_v_cnt, restricted, res['user_id']))
+            violation_info = {'violation_count': new_v_cnt, 'is_restricted': restricted}
+
+    db.commit()
+    return jsonify({
+        'status': new_status,
+        'message': '座位已释放' + ('，并记违规1次' if is_violation else ''),
+        'user_violation': violation_info
+    })
+
+@app.route('/api/admin/active-reservations', methods=['GET'])
+@admin_required
+def admin_active_reservations():
+    """获取当前所有使用中或待签到的预约，供 AI 巡查模块即时关联"""
+    db = get_db()
+    cur = db.cursor()
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cur.execute('''
+        SELECT r.id, r.seat_id, r.user_id, r.user_name, r.start_time, r.end_time, r.status, r.checkin_time,
+               s.name as seat_name, s.floor, s.zone, u.nickname
+        FROM reservations r
+        JOIN seats s ON r.seat_id = s.id
+        LEFT JOIN users u ON r.user_id = u.id
+        WHERE r.status IN ('active', 'reserved') AND r.end_time > ?
+        ORDER BY r.status DESC, r.start_time ASC
+    ''', (now_str,))
+    rows = [dict(row) for row in cur.fetchall()]
+    return jsonify({'rows': rows})
+
+@app.route('/api/admin/demo/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_demo_settings():
+    """获取或切换现场演示加速设置"""
+    if request.method == 'POST':
+        data = request.json or {}
+        fast = data.get('fast', False)
+        if fast:
+            LIBRARY_CONFIG['checkin_timeout_min'] = 0.5  # 演示加速模式：30秒超时
+        else:
+            LIBRARY_CONFIG['checkin_timeout_min'] = 15   # 正常模式：15分钟
+        return jsonify({
+            'demo_fast': LIBRARY_CONFIG['checkin_timeout_min'] < 1,
+            'checkin_timeout_min': LIBRARY_CONFIG['checkin_timeout_min'],
+            'checkin_timeout_label': f"{int(LIBRARY_CONFIG['checkin_timeout_min'] * 60)} 秒" if LIBRARY_CONFIG['checkin_timeout_min'] < 1 else f"{int(LIBRARY_CONFIG['checkin_timeout_min'])} 分钟"
+        })
+
+    is_fast = LIBRARY_CONFIG['checkin_timeout_min'] < 1
+    return jsonify({
+        'demo_fast': is_fast,
+        'checkin_timeout_min': LIBRARY_CONFIG['checkin_timeout_min'],
+        'checkin_timeout_label': f"{int(LIBRARY_CONFIG['checkin_timeout_min'] * 60)} 秒" if is_fast else f"{int(LIBRARY_CONFIG['checkin_timeout_min'])} 分钟",
+        'max_violation': LIBRARY_CONFIG['max_violation_limit'],
+        'open_hour': LIBRARY_CONFIG['open_time'].hour,
+        'close_hour': LIBRARY_CONFIG['close_time'].hour
+    })
+
+@app.route('/api/admin/demo/create-noshow', methods=['POST'])
+@admin_required
+def admin_demo_create_noshow():
+    """生成一条超时未签到预约演示数据，供评委验收后台自动巡检流转"""
+    db = get_db()
+    cur = db.cursor()
+    
+    # 找一个普通用户
+    cur.execute("SELECT id, username, nickname FROM users WHERE role = 'user' ORDER BY id ASC LIMIT 1")
+    user = cur.fetchone()
+    if not user:
+        from werkzeug.security import generate_password_hash
+        pwd_hash = generate_password_hash('123456')
+        cur.execute("INSERT INTO users (username, nickname, password, role) VALUES ('demo_student', '演示学生小李', ?, 'user')", (pwd_hash,))
+        db.commit()
+        user_id = cur.lastrowid
+        user_name = 'demo_student'
+        nickname = '演示学生小李'
+    else:
+        user_id = user['id']
+        user_name = user['username']
+        nickname = user['nickname']
+
+    now = datetime.now()
+    cur.execute('''
+        SELECT id, name FROM seats 
+        WHERE id NOT IN (
+            SELECT seat_id FROM reservations WHERE status IN ('reserved', 'active') AND end_time > ?
+        ) LIMIT 1
+    ''', (now.strftime('%Y-%m-%d %H:%M:%S'),))
+    seat = cur.fetchone()
+    if not seat:
+        cur.execute("SELECT id, name FROM seats LIMIT 1")
+        seat = cur.fetchone()
+
+    is_fast = LIBRARY_CONFIG['checkin_timeout_min'] < 1
+    minutes_ago = 1 if is_fast else 16
+    start_dt = now - timedelta(minutes=minutes_ago)
+    end_dt = start_dt + timedelta(hours=2)
+
+    cur.execute('''
+        INSERT INTO reservations (seat_id, user_id, user_name, start_time, end_time, status)
+        VALUES (?, ?, ?, ?, ?, 'reserved')
+    ''', (seat['id'], user_id, user_name, start_dt.strftime('%Y-%m-%d %H:%M:%S'), end_dt.strftime('%Y-%m-%d %H:%M:%S')))
+    res_id = cur.lastrowid
+    db.commit()
+
+    return jsonify({
+        'ok': True,
+        'message': f'已成功创建测试预约！座位：{seat["name"]}，学生：{nickname}，由于开座未签到已超时，将在后台自动巡检时判定违规释放！',
+        'reservation_id': res_id,
+        'seat_name': seat['name'],
+        'student_name': nickname
+    })
+
+@app.route('/api/admin/demo/reset', methods=['POST'])
+@admin_required
+def admin_demo_reset():
+    """重置演示数据与测试学生违规状态"""
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("UPDATE users SET violation_count = 0, is_restricted = 0 WHERE role = 'user'")
+    db.commit()
+    return jsonify({'ok': True, 'message': '已重置测试学生违约次数与受限状态'})
 
 @app.route('/api/admin/stats', methods=['GET'])
 @admin_required
@@ -930,6 +1512,12 @@ def admin_stats():
 @app.route('/login')
 def login_page():
     return send_from_directory(app.static_folder, 'login.html')
+
+@app.route('/app')
+@app.route('/miniapp')
+@app.route('/smart-seat')
+def miniapp_page():
+    return send_from_directory(app.static_folder, 'app.html')
 
 @app.route('/register')
 def register_page():

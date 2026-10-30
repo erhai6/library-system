@@ -90,6 +90,8 @@ async function authFetch(url, options = {}) {
 }
 
 // ==================== 双端导航 Tab 切换 (Mobile & Desktop) ====================
+let currentLeaderboardType = 'daily';
+
 function switchTab(name) {
     document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
     document.querySelectorAll('.tab-bar-item').forEach(b => b.classList.remove('active'));
@@ -119,6 +121,10 @@ function switchTab(name) {
         loadSchedule();
     } else if (name === 'book') {
         loadSeats();
+    } else if (name === 'leaderboard') {
+        loadLeaderboard(currentLeaderboardType);
+    } else if (name === 'stats') {
+        loadStudyStats();
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -127,11 +133,15 @@ function switchTab(name) {
 // 绑定移动端 TabBar
 document.getElementById('nav-book').addEventListener('click', () => switchTab('book'));
 document.getElementById('nav-schedule').addEventListener('click', () => switchTab('schedule'));
+document.getElementById('nav-leaderboard').addEventListener('click', () => switchTab('leaderboard'));
+document.getElementById('nav-stats').addEventListener('click', () => switchTab('stats'));
 document.getElementById('nav-mine').addEventListener('click', () => switchTab('mine'));
 
 // 绑定电脑端顶部 Tabs
 document.getElementById('desk-tab-book').addEventListener('click', () => switchTab('book'));
 document.getElementById('desk-tab-schedule').addEventListener('click', () => switchTab('schedule'));
+document.getElementById('desk-tab-leaderboard').addEventListener('click', () => switchTab('leaderboard'));
+document.getElementById('desk-tab-stats').addEventListener('click', () => switchTab('stats'));
 document.getElementById('desk-tab-mine').addEventListener('click', () => switchTab('mine'));
 
 // ==================== 楼层筛选滑轨 ====================
@@ -528,6 +538,18 @@ async function loadMyReservations() {
                 `;
             }
 
+            let durationInfoHtml = '';
+            if (item.actual_minutes && item.actual_minutes > 0) {
+                const h = Math.floor(item.actual_minutes / 60);
+                const m = item.actual_minutes % 60;
+                const durStr = (h > 0 ? `${h}小时` : '') + (m > 0 ? `${m}分` : (h === 0 ? '0分' : ''));
+                durationInfoHtml = `
+                    <div class="res-time-row" style="color:#28a745; font-weight:600;">
+                        <span>⏱️ 实际专注学习：</span><strong>${durStr}</strong>
+                    </div>
+                `;
+            }
+
             card.innerHTML = `
                 <div class="res-card-header">
                     <span class="res-seat-tag">💺 座位 #${item.seat_id}</span>
@@ -539,6 +561,7 @@ async function loadMyReservations() {
                 <div class="res-time-row">
                     <span>🏁 结束：</span><strong>${item.end_time}</strong>
                 </div>
+                ${durationInfoHtml}
                 <div class="res-actions">
                     ${actionsHtml}
                 </div>
@@ -608,3 +631,406 @@ async function loadMyReservations() {
 
 // 首次进入默认加载
 loadSeats();
+
+// ==========================================================================
+// 10. 学习时长排行榜专属逻辑 (Leaderboard Logic)
+// ==========================================================================
+
+// 监听排行榜子分类维度切换
+document.querySelectorAll('.lb-sub-nav .lb-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.lb-sub-nav .lb-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentLeaderboardType = btn.dataset.type || 'daily';
+        loadLeaderboard(currentLeaderboardType);
+    });
+});
+
+async function loadLeaderboard(type = 'daily') {
+    const listWrap = document.getElementById('leaderboard-list');
+    const podiumWrap = document.getElementById('podium-wrap');
+    if (listWrap) {
+        listWrap.innerHTML = '<p style="text-align:center; color:#999; padding:2rem 0;">⚡ 正在实时拉取光荣榜数据...</p>';
+    }
+
+    try {
+        const resp = await authFetch(`/api/leaderboard?type=${encodeURIComponent(type)}`);
+        if (!resp.ok) {
+            throw new Error('网络请求异常');
+        }
+        const data = await resp.json();
+        renderLeaderboard(data);
+    } catch (err) {
+        if (listWrap) {
+            listWrap.innerHTML = '<p style="text-align:center; color:#e53e3e; padding:1.5rem 0;">拉取排行榜数据失败，请稍后刷新重试</p>';
+        }
+    }
+}
+
+function renderLeaderboard(data) {
+    const listWrap = document.getElementById('leaderboard-list');
+    const podiumWrap = document.getElementById('podium-wrap');
+    const updateTimeEl = document.getElementById('lb-update-time');
+
+    if (updateTimeEl) {
+        const now = new Date();
+        const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        updateTimeEl.textContent = `已于 ${timeStr} 实时刷新`;
+    }
+
+    // 1. 渲染我的专属战况卡片
+    const myRank = data.my_rank || {};
+    const myNameEl = document.getElementById('my-rank-nickname');
+    const myAvatarEl = document.getElementById('my-rank-avatar');
+    const myBadgeEl = document.getElementById('my-rank-badge');
+    const myMetaEl = document.getElementById('my-rank-meta');
+    const myNumEl = document.getElementById('my-rank-number');
+    const myStudyingTag = document.getElementById('my-studying-tag');
+
+    const displayNick = myRank.nickname || currentNickname || '同学';
+    if (myNameEl) myNameEl.textContent = displayNick;
+    if (myAvatarEl) myAvatarEl.textContent = displayNick.charAt(0).toUpperCase();
+    if (myBadgeEl) myBadgeEl.textContent = `${myRank.badge || '🌱 新苗'} · ${myRank.title || '初入书林'}`;
+    if (myMetaEl) myMetaEl.textContent = `学习时长：${myRank.formatted_time || '0分钟'} | 自习次数：${myRank.sessions || 0}次`;
+    if (myNumEl) {
+        if (typeof myRank.rank === 'number') {
+            myNumEl.innerHTML = `第 <span style="font-size:1.8rem; color:#ffd700;">${myRank.rank}</span> 名`;
+        } else {
+            myNumEl.textContent = myRank.rank || '暂未上榜';
+        }
+    }
+    if (myStudyingTag) {
+        myStudyingTag.style.display = myRank.is_active ? 'inline-block' : 'none';
+    }
+
+    const items = data.leaderboard || [];
+
+    // 2. 渲染前三名领奖台 Podium
+    if (items.length > 0 && podiumWrap) {
+        podiumWrap.style.display = 'flex';
+
+        // 辅助更新领奖台单人卡片
+        const fillPodium = (index, rankNum) => {
+            const item = items[index];
+            const nameEl = document.getElementById(`podium-name-${rankNum}`);
+            const timeEl = document.getElementById(`podium-time-${rankNum}`);
+            if (item) {
+                if (nameEl) nameEl.textContent = item.nickname || item.username;
+                if (timeEl) timeEl.textContent = item.formatted_time;
+            } else {
+                if (nameEl) nameEl.textContent = '虚位以待';
+                if (timeEl) timeEl.textContent = '--';
+            }
+        };
+
+        fillPodium(0, 1); // 状元
+        fillPodium(1, 2); // 榜眼
+        fillPodium(2, 3); // 探花
+    } else if (podiumWrap) {
+        podiumWrap.style.display = 'none';
+    }
+
+    // 3. 渲染完整排行榜列表
+    if (!listWrap) return;
+
+    if (items.length === 0) {
+        listWrap.innerHTML = `
+            <div style="text-align:center; padding:2.5rem 1rem; color:#718096;">
+                <div style="font-size:2.4rem; margin-bottom:0.5rem;">📖</div>
+                <div style="font-weight:600; font-size:1rem; margin-bottom:4px; color:#4a5568;">当前榜单暂无同学上榜</div>
+                <div style="font-size:0.85rem;">趁现在马上预约一个座位，成为今日图书馆第一名学霸吧！</div>
+            </div>
+        `;
+        return;
+    }
+
+    listWrap.innerHTML = '';
+    items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'lb-item-row';
+
+        let rankClass = '';
+        let rankBadge = `${item.rank}`;
+        if (item.rank === 1) { rankClass = 'rank-1'; rankBadge = '🥇'; }
+        else if (item.rank === 2) { rankClass = 'rank-2'; rankBadge = '🥈'; }
+        else if (item.rank === 3) { rankClass = 'rank-3'; rankBadge = '🥉'; }
+
+        const initialChar = (item.nickname || item.username || '学').charAt(0).toUpperCase();
+
+        row.innerHTML = `
+            <div class="lb-item-rank ${rankClass}">${rankBadge}</div>
+            <div class="lb-item-avatar">${initialChar}</div>
+            <div class="lb-item-info">
+                <div class="lb-item-top">
+                    <span class="lb-item-name">${escapeHtml(item.nickname || item.username)}</span>
+                    <span class="lb-item-title-badge">${escapeHtml(item.badge || '')} ${escapeHtml(item.title || '')}</span>
+                    ${item.is_active ? '<span style="color:#28a745; font-size:0.75rem; font-weight:bold; margin-left:4px;">● 在座中</span>' : ''}
+                </div>
+                <div class="lb-item-sub">累计打卡入座 ${item.sessions} 次</div>
+            </div>
+            <div class="lb-item-right">
+                <div class="lb-item-time">${item.formatted_time}</div>
+                <div class="lb-item-count">总专注时长</div>
+            </div>
+        `;
+        listWrap.appendChild(row);
+    });
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// ==========================================================================
+// 11. 个人学情档案与自定义时间段统计逻辑 (Study Stats & Analytics)
+// ==========================================================================
+
+// 初始化自定义日期控件（默认本月）
+function initDateRangeInputs() {
+    const startInput = document.getElementById('range-start-date');
+    const endInput = document.getElementById('range-end-date');
+    if (!startInput || !endInput) return;
+
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = pad(now.getMonth() + 1);
+    const curDay = pad(now.getDate());
+
+    const firstDayOfMonth = `${curYear}-${curMonth}-01`;
+    const today = `${curYear}-${curMonth}-${curDay}`;
+
+    if (!startInput.value) startInput.value = firstDayOfMonth;
+    if (!endInput.value) endInput.value = today;
+
+    // 快捷按钮监听
+    document.querySelectorAll('.btn-quick-date').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.btn-quick-date').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const type = btn.dataset.days;
+            const endD = new Date();
+            let startD = new Date();
+
+            if (type === '7') {
+                startD.setDate(endD.getDate() - 6);
+            } else if (type === '14') {
+                startD.setDate(endD.getDate() - 13);
+            } else if (type === '30') {
+                startD.setDate(endD.getDate() - 29);
+            } else if (type === 'month') {
+                startD = new Date(endD.getFullYear(), endD.getMonth(), 1);
+            }
+
+            startInput.value = `${startD.getFullYear()}-${pad(startD.getMonth()+1)}-${pad(startD.getDate())}`;
+            endInput.value = `${endD.getFullYear()}-${pad(endD.getMonth()+1)}-${pad(endD.getDate())}`;
+
+            // 自动执行查询
+            queryCustomRangeStats(startInput.value, endInput.value);
+        });
+    });
+
+    // 查询按钮点击
+    const queryBtn = document.getElementById('btn-do-query-range');
+    if (queryBtn) {
+        queryBtn.addEventListener('click', () => {
+            if (!startInput.value || !endInput.value) {
+                alert('请选择开始日期和结束日期');
+                return;
+            }
+            if (startInput.value > endInput.value) {
+                alert('开始日期不能大于结束日期');
+                return;
+            }
+            queryCustomRangeStats(startInput.value, endInput.value);
+        });
+    }
+
+    // 默认执行一次本月查询
+    queryCustomRangeStats(startInput.value, endInput.value);
+}
+
+async function loadStudyStats() {
+    try {
+        const resp = await authFetch('/api/user/study-stats');
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        // 1. 正在自习中提示
+        const activeCard = document.getElementById('stats-active-alert');
+        const activeDesc = document.getElementById('stats-active-desc');
+        if (activeCard && activeDesc) {
+            if (data.active_session) {
+                activeCard.style.display = 'flex';
+                activeDesc.textContent = `当前座位：${data.active_session.seat_name} (${data.active_session.zone || ''}) | 已专注学习：${data.active_session.formatted}`;
+            } else {
+                activeCard.style.display = 'none';
+            }
+        }
+
+        // 2. 四大核心看板
+        const ov = data.overview || {};
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val || '0分钟';
+        };
+        setVal('stat-val-today', ov.today_formatted);
+        setVal('stat-val-week', ov.week_formatted);
+        setVal('stat-val-month', ov.month_formatted);
+        setVal('stat-val-total', ov.total_formatted);
+
+        // 3. 学霸段位卡片
+        const lv = data.level_info || {};
+        const lvBadgeEl = document.getElementById('user-level-badge');
+        const lvTitleEl = document.getElementById('user-level-title');
+        const lvHoursEl = document.getElementById('user-level-hours');
+        const lvBarEl = document.getElementById('user-level-progress-bar');
+        const lvCurLabel = document.getElementById('user-level-current-label');
+        const lvNextHint = document.getElementById('user-level-next-hint');
+
+        if (lvBadgeEl) lvBadgeEl.textContent = lv.badge ? lv.badge.split(' ')[0] : '🌱';
+        if (lvTitleEl) lvTitleEl.textContent = `${lv.title || '初入书林'} (Lv.${lv.level || 1})`;
+        if (lvHoursEl) lvHoursEl.textContent = `${lv.hours || 0} 小时`;
+        if (lvBarEl) lvBarEl.style.width = `${lv.progress || 0}%`;
+        if (lvCurLabel) lvCurLabel.textContent = `当前段位：Lv.${lv.level || 1} ${lv.title || ''}`;
+        if (lvNextHint) {
+            if (lv.needed_hours > 0) {
+                lvNextHint.textContent = `距晋级「${lv.next_title}」还需 ${lv.needed_hours} 小时 (${lv.progress}%)`;
+            } else {
+                lvNextHint.textContent = '🌟 您已登峰造极，荣获宗师称号！';
+            }
+        }
+
+        // 4. 初始化昵称输入框
+        const nickInput = document.getElementById('input-new-nickname');
+        if (nickInput && !nickInput.value) {
+            nickInput.value = currentNickname || '';
+        }
+
+        // 5. 初始化日期区间并执行查询
+        initDateRangeInputs();
+
+    } catch (e) {
+        console.error('加载学情统计失败', e);
+    }
+}
+
+// 快速跳转至“我的预约”去结算座位
+const gotoReleaseBtn = document.getElementById('stats-goto-release-btn');
+if (gotoReleaseBtn) {
+    gotoReleaseBtn.addEventListener('click', () => {
+        switchTab('mine');
+    });
+}
+
+// 自定义时间段查询
+async function queryCustomRangeStats(startDate, endDate) {
+    const totalValEl = document.getElementById('range-total-val');
+    const avgValEl = document.getElementById('range-avg-val');
+    const daysValEl = document.getElementById('range-days-val');
+    const dailyListEl = document.getElementById('range-daily-list');
+
+    if (dailyListEl) {
+        dailyListEl.innerHTML = '<p style="text-align:center; color:#999; padding:1rem 0;">📊 正在分析学时数据...</p>';
+    }
+
+    try {
+        const resp = await authFetch(`/api/user/study-stats?start_date=${startDate}&end_date=${endDate}`);
+        if (!resp.ok) throw new Error('查询失败');
+        const data = await resp.json();
+        const custom = data.custom_range;
+
+        if (!custom) return;
+
+        if (totalValEl) totalValEl.textContent = custom.formatted_time || '0分钟';
+        if (avgValEl) avgValEl.textContent = custom.avg_daily_formatted || '0分钟';
+        if (daysValEl) daysValEl.textContent = `${custom.active_days || 0} 天`;
+
+        if (!dailyListEl) return;
+
+        const breakdown = custom.daily_breakdown || [];
+        if (breakdown.length === 0) {
+            dailyListEl.innerHTML = '<p style="text-align:center; color:#718096; padding:1.2rem 0; font-size:0.88rem;">该时间段内暂无在馆专注自习记录，快来学习打卡吧！</p>';
+            return;
+        }
+
+        dailyListEl.innerHTML = '';
+        breakdown.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'range-daily-item';
+            row.innerHTML = `
+                <div class="range-daily-date">📅 ${item.date}</div>
+                <div class="range-daily-time">⏱️ ${item.formatted}</div>
+            `;
+            dailyListEl.appendChild(row);
+        });
+
+    } catch (err) {
+        if (dailyListEl) {
+            dailyListEl.innerHTML = '<p style="text-align:center; color:#e53e3e; padding:1rem 0;">统计分析失败，请检查网络</p>';
+        }
+    }
+}
+
+// 保存/修改展示昵称
+const saveNickBtn = document.getElementById('btn-save-nickname');
+if (saveNickBtn) {
+    saveNickBtn.addEventListener('click', async () => {
+        const nickInput = document.getElementById('input-new-nickname');
+        const msgEl = document.getElementById('nickname-msg');
+        const newNick = (nickInput ? nickInput.value : '').trim();
+
+        if (!newNick) {
+            if (msgEl) {
+                msgEl.style.color = '#e53e3e';
+                msgEl.textContent = '❌ 昵称不能为空';
+            }
+            return;
+        }
+
+        try {
+            saveNickBtn.disabled = true;
+            saveNickBtn.textContent = '保存中...';
+
+            const resp = await authFetch('/api/user/update-nickname', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nickname: newNick })
+            });
+
+            const resData = await resp.json();
+            if (resp.ok) {
+                if (msgEl) {
+                    msgEl.style.color = '#38a169';
+                    msgEl.textContent = '✅ ' + (resData.message || '昵称修改成功！');
+                }
+                localStorage.setItem('nickname', newNick);
+                const welcomeEl = document.getElementById('welcome-name');
+                if (welcomeEl) welcomeEl.textContent = newNick;
+
+                // 同步刷新排行榜与个人学时
+                loadStudyStats();
+                loadLeaderboard(currentLeaderboardType);
+            } else {
+                if (msgEl) {
+                    msgEl.style.color = '#e53e3e';
+                    msgEl.textContent = '❌ ' + (resData.error || '修改失败');
+                }
+            }
+        } catch (e) {
+            if (msgEl) {
+                msgEl.style.color = '#e53e3e';
+                msgEl.textContent = '❌ 请求出错，请重试';
+            }
+        } finally {
+            saveNickBtn.disabled = false;
+            saveNickBtn.textContent = '💾 保存昵称';
+        }
+    });
+}

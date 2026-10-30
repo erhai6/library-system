@@ -8,6 +8,7 @@
     <!-- 引入 TensorFlow.js & COCO-SSD 模型供管理员巡视检测 -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <script src="/static/js/ai-annot-data.js"></script>
     <style>
         .admin-dashboard {
             display: grid;
@@ -113,6 +114,7 @@
             <button class="desktop-tab-btn" id="tab-btn-reservations">📋 预约记录多维检索</button>
             <button class="desktop-tab-btn" id="tab-btn-users">👥 学生名单与违约惩罚</button>
             <button class="desktop-tab-btn" id="tab-btn-ai">📷 AI 视觉在馆巡查</button>
+            <a href="/app" style="margin-left:auto; text-decoration:none; padding:8px 14px; background:linear-gradient(135deg, #10b981, #059669); color:white; border-radius:6px; font-size:0.88rem; font-weight:600; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(16,185,129,0.3);">🚀 进入一体化小程序版</a>
         </div>
 
         <!-- 1. 监控大屏 Tab -->
@@ -141,6 +143,29 @@
                 <div id="floor-stat-container" style="display:flex; gap:1.5rem; flex-wrap:wrap;">
                     <!-- 动态渲染 -->
                 </div>
+            </div>
+
+            <!-- 现场演示与自动化巡检测试工具 -->
+            <div class="demo-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                    <h3 style="margin:0; font-size:1.02rem; color:#1e3a8a;">🧪 现场演示与自动化巡查验证工具</h3>
+                    <span id="demo-badge" style="background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:600;">评委演示专属</span>
+                </div>
+                <p style="margin:0 0 0.8rem; font-size:0.84rem; color:#64748b;">
+                    支持一键将 15 分钟超时未签到时限压缩为 30 秒，极速向评委展示开座未到、后台自动化巡查引擎识别流转、违规记录与黑名单惩罚的全链路！
+                </p>
+                <div style="display:flex; gap:0.8rem; flex-wrap:wrap; align-items:center;">
+                    <label style="display:flex; align-items:center; gap:0.45rem; font-size:0.88rem; cursor:pointer; font-weight:600; color:#1e293b; background:white; padding:0.4rem 0.8rem; border-radius:6px; border:1px solid #cbd5e1;">
+                        <input type="checkbox" id="demo-fast-cb" style="width:16px; height:16px; cursor:pointer;"> ⚡ 演示加速模式 (30秒超时)
+                    </label>
+                    <button class="btn-tool" id="btn-demo-create-noshow" style="background:var(--primary); color:white; border:none; padding:0.45rem 1rem; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:600;">
+                        ⚡ 生成一条「超时未签到」测试预约
+                    </button>
+                    <button class="btn-tool" id="btn-demo-reset" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:0.45rem 0.9rem; border-radius:6px; cursor:pointer; font-size:0.85rem;">
+                        ♻️ 清理演示并重置学生违约
+                    </button>
+                </div>
+                <p id="demo-rule-hint" style="margin:0.7rem 0 0; font-size:0.8rem; color:#64748b; border-top:1px dashed #cbd5e1; padding-top:0.5rem;"></p>
             </div>
         </div>
 
@@ -227,36 +252,72 @@
 
         <!-- 4. AI 视觉巡查 Tab (管理员专属) -->
         <div id="tab-ai" class="tab-panel" style="display:none;">
-            <div class="ai-monitor-container">
-                <div>
-                    <h3 style="margin-top:0;">📹 摄像头视觉巡检</h3>
-                    <p style="font-size:0.85rem; color:#718096;">利用 TensorFlow.js COCO-SSD 模型实时识别人体 (Person)，比对空座实际入座情况。</p>
-                    
-                    <div class="video-box">
-                        <video id="webcam" autoplay muted playsinline width="360" height="270" style="border-radius:6px;"></video>
-                        <canvas id="overlay" width="360" height="270" style="position:absolute; top:0; left:0;"></canvas>
+            <div class="ai-grid">
+                <!-- 左栏：视频监控与控制 -->
+                <div class="ai-card">
+                    <h3 style="margin:0 0 0.3rem; font-size:1.05rem; color:#1e293b;">📹 摄像头视觉巡检</h3>
+                    <p style="font-size:0.82rem; color:#64748b; margin:0 0 0.8rem;">
+                        基于深度学习目标检测模型，俯视角实时识别「有人在座 / 有物无人」，精准研判占座行为并联动违约处置。
+                    </p>
+
+                    <!-- 模式切换 -->
+                    <div class="src-bar">
+                        <button class="src-btn active" id="src-btn-east" data-src="east">🎬 模拟俯拍 (离线实拍)</button>
+                        <button class="src-btn" id="src-btn-file" data-src="file">📁 本地素材 (图片/视频)</button>
+                        <button class="src-btn" id="src-btn-cam" data-src="cam">📷 实时摄像头</button>
                     </div>
 
-                    <div style="margin-top:0.8rem; display:flex; gap:0.6rem;">
-                        <button id="start-camera-btn" style="background:#28a745; color:white; border:none; padding:0.5rem 1.2rem; border-radius:6px; cursor:pointer; font-weight:bold;">
-                            ▶️ 开启摄像头巡检
+                    <!-- 视频视窗 -->
+                    <div class="video-box">
+                        <video id="ai-video" autoplay muted loop playsinline></video>
+                        <canvas id="ai-canvas" width="480" height="360"></canvas>
+                    </div>
+
+                    <input type="file" id="ai-file-input" accept="video/*,image/*" style="display:none" />
+
+                    <!-- 操作控制栏 -->
+                    <div style="margin-top:0.85rem; display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
+                        <button id="ai-start-btn" style="background:#16a34a; color:white; border:none; padding:0.55rem 1.4rem; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.9rem; transition:background 0.15s;">
+                            ▶️ 开启巡查
                         </button>
-                        <button id="stop-camera-btn" style="background:#6c757d; color:white; border:none; padding:0.5rem 1rem; border-radius:6px; cursor:pointer;">
+                        <button id="ai-stop-btn" style="background:#64748b; color:white; border:none; padding:0.55rem 1.2rem; border-radius:6px; cursor:pointer; font-size:0.9rem;">
                             ⏹️ 关闭巡视
                         </button>
                     </div>
+
+                    <div style="margin-top:0.6rem; font-size:0.8rem; color:#64748b; line-height:1.5;" id="ai-src-hint">
+                        💡 模拟俯拍：内置真实场馆 10 秒监控录像与逐帧跟踪标注，零网络零硬件依赖，自动追踪在座读者与空位。
+                    </div>
+
+                    <div style="margin-top:0.5rem; font-size:0.88rem; color:#334155; padding-top:0.5rem; border-top:1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                        <span>巡检状态：<strong id="ai-status" style="color:#16a34a;">待机中</strong></span>
+                        <span id="ai-fps-badge" style="font-size:0.75rem; color:#94a3b8;">30 FPS</span>
+                    </div>
                 </div>
 
-                <div>
-                    <h3 style="margin-top:0;">🤖 实时视觉分析日志</h3>
-                    <div style="background:#f8f9fa; border:1px solid #e2e8f0; border-radius:6px; padding:1rem; height:270px; overflow-y:auto; font-family:monospace; font-size:0.85rem;" id="ai-log">
-                        <div>[AI系统就绪] 等待开启摄像头...</div>
+                <!-- 右栏：实时终端流日志与占座告警 -->
+                <div class="ai-card">
+                    <h3 style="margin:0 0 0.6rem; font-size:1.02rem; color:#1e293b;">🤖 实时视觉分析终端</h3>
+                    <div class="log-box" id="ai-log">
+                        <div><span class="t">[系统]</span> <span class="ok">AI 视觉巡视引擎已就绪，点击左侧「开启巡查」开始分析…</span></div>
                     </div>
-                    <div style="margin-top:0.8rem; font-size:0.88rem; color:#4a5568;">
-                        当前检测状态：<strong id="ai-status" style="color:var(--primary);">待机</strong>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin:1rem 0 0.5rem;">
+                        <h4 style="margin:0; font-size:0.95rem; color:#b45309; display:flex; align-items:center; gap:0.35rem;">
+                            <span>⚠️ 疑似占座告警队列</span>
+                            <span id="ai-alert-count" style="background:#fef3c7; color:#92400e; font-size:0.72rem; padding:1px 6px; border-radius:10px; font-weight:700;">0</span>
+                        </h4>
+                        <span style="font-size:0.76rem; color:#78350f;">判定逻辑：有物无人持续3次(2.4秒)</span>
+                    </div>
+                    
+                    <div id="ai-events-container" style="max-height:220px; overflow-y:auto;">
+                        <p class="empty" style="color:#94a3b8; font-size:0.85rem; padding:1rem 0; text-align:center; margin:0;">
+                            暂无占座告警，场馆秩序良好
+                        </p>
                     </div>
                 </div>
             </div>
+        </div>
         </div>
 
     </div>
