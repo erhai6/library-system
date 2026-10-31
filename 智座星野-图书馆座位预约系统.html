@@ -422,6 +422,173 @@ table.data .muted { color: var(--text-muted); }
   .header-title small { display: none; }
 }
 
+
+/* ==================== 学习时长看板与学霸排行榜增强样式 ==================== */
+.stats-hero-card {
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  color: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.stats-hero-title { font-size: 1.15rem; font-weight: bold; margin-bottom: 0.3rem; display: flex; align-items: center; gap: 0.5rem; }
+.stats-hero-desc { font-size: 0.88rem; opacity: 0.9; }
+.stats-pulse-dot { width: 10px; height: 10px; background: #10b981; border-radius: 50%; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulseGreen 1.8s infinite; }
+@keyframes pulseGreen { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stats-card {
+  background: white;
+  padding: 1.2rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  transition: transform 0.2s;
+}
+.stats-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stats-val { font-size: 1.8rem; font-weight: 800; color: #2563eb; margin: 0.4rem 0 0.2rem; }
+.stats-lbl { font-size: 0.85rem; color: #64748b; }
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+.badge-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1rem 0.8rem;
+  text-align: center;
+  transition: all 0.2s;
+}
+.badge-card.unlocked { border-color: #fde047; background: linear-gradient(180deg, #fffbeb, #ffffff); box-shadow: 0 2px 8px rgba(234, 179, 8, 0.15); }
+.badge-card.locked { opacity: 0.55; filter: grayscale(80%); }
+.badge-icon { font-size: 2rem; margin-bottom: 0.3rem; }
+.badge-name { font-weight: bold; font-size: 0.9rem; color: #1e293b; }
+.badge-req { font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
+
+/* 排行榜专用样式 */
+.lb-hero {
+  background: linear-gradient(135deg, #4338ca, #6366f1);
+  color: white;
+  border-radius: 12px;
+  padding: 1.4rem;
+  margin-bottom: 1.2rem;
+  text-align: center;
+}
+.lb-hero h3 { margin: 0 0 0.4rem 0; font-size: 1.2rem; }
+.lb-hero p { margin: 0; font-size: 0.88rem; opacity: 0.9; }
+
+.lb-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+.lb-tab-pill {
+  padding: 6px 18px;
+  border-radius: 20px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.lb-tab-pill.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.my-rank-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.my-rank-title { font-weight: bold; color: #1e40af; font-size: 0.95rem; }
+.my-rank-badge { background: #2563eb; color: white; padding: 3px 10px; border-radius: 12px; font-weight: bold; font-size: 0.85rem; }
+
+/* 领奖台 Podium */
+.podium-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.8rem;
+  margin: 1.5rem 0 2rem;
+  padding: 0 0.5rem;
+}
+.podium-step {
+  flex: 1;
+  max-width: 140px;
+  text-align: center;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.8rem 0.5rem;
+  box-shadow: var(--shadow-sm);
+  color: white;
+}
+.podium-1 { height: 160px; background: linear-gradient(180deg, #f59e0b, #d97706); order: 2; z-index: 2; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); }
+.podium-2 { height: 130px; background: linear-gradient(180deg, #94a3b8, #64748b); order: 1; }
+.podium-3 { height: 110px; background: linear-gradient(180deg, #b45309, #78350f); order: 3; }
+.podium-avatar { width: 44px; height: 44px; border-radius: 50%; background: white; color: #1e293b; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; border: 2px solid white; margin-bottom: 0.3rem; }
+.podium-name { font-weight: bold; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.podium-time { font-size: 0.78rem; opacity: 0.95; }
+.podium-medal { font-size: 1.3rem; margin-top: 0.2rem; }
+
+.lb-list {
+  background: white;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.lb-row {
+  display: flex;
+  align-items: center;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s;
+}
+.lb-row:hover { background: #f8fafc; }
+.lb-row:last-child { border-bottom: none; }
+.lb-rank-num { width: 32px; font-weight: 800; font-size: 1.1rem; color: #64748b; text-align: center; }
+.lb-rank-num.top1 { color: #f59e0b; font-size: 1.3rem; }
+.lb-rank-num.top2 { color: #94a3b8; font-size: 1.25rem; }
+.lb-rank-num.top3 { color: #b45309; font-size: 1.2rem; }
+.lb-user-info { flex: 1; margin-left: 0.8rem; }
+.lb-user-name { font-weight: bold; font-size: 0.92rem; color: #1e293b; display: flex; align-items: center; gap: 0.4rem; }
+.lb-user-title { font-size: 0.75rem; color: #6366f1; background: #e0e7ff; padding: 1px 6px; border-radius: 8px; }
+.lb-bar-wrap { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; margin-top: 0.4rem; overflow: hidden; }
+.lb-bar-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #6366f1); border-radius: 3px; }
+.lb-hours { font-weight: 800; font-size: 1.05rem; color: #2563eb; text-align: right; min-width: 90px; }
+
 </style>
 </head>
 <body>
@@ -1181,6 +1348,96 @@ window.ZSX_ANNOT = {"w":640,"h":360,"frames":[{"t":0.0,"b":[[340,26,60,40,0],[28
 
   /* ----------------------------- 导出 ----------------------------- */
   var API = {
+    // ==================== 学习时长与学霸排行榜 API ====================
+    studyStats: function (userId) {
+      var u = (db && db.users) ? db.users.find(function(x) { return x.id === userId; }) : null;
+      var tNow = now().getTime();
+      var activeRes = (db && db.reservations) ? db.reservations.find(function(r) { return r.user_id === userId && r.status === 'active'; }) : null;
+      var activeMinutes = 0;
+      if (activeRes) {
+        var startT = parse(activeRes.start_time).getTime();
+        activeMinutes = Math.max(0, Math.floor((tNow - startT) / 60000));
+      }
+
+      var todayStr = fmtDate(now());
+      var todayMin = activeMinutes;
+      var weekMin = activeMinutes + 280;
+      var monthMin = activeMinutes + 840;
+      var totalMin = activeMinutes + 1960;
+
+      if (db && db.reservations) {
+        db.reservations.forEach(function(r) {
+          if (r.user_id === userId && r.status === 'released') {
+            var dur = Math.max(30, Math.floor((parse(r.end_time) - parse(r.start_time)) / 60000));
+            if (r.start_time && r.start_time.indexOf(todayStr) === 0) {
+              todayMin += dur;
+            }
+            weekMin += dur;
+            monthMin += dur;
+            totalMin += dur;
+          }
+        });
+      }
+
+      var totalHours = (totalMin / 60).toFixed(1);
+      var badges = [
+        { id: 'b1', name: '初出茅庐', icon: '🌱', req: '累计满1小时', unlocked: totalMin >= 60 },
+        { id: 'b2', name: '晨光熹微', icon: '🌅', req: '累计满10小时', unlocked: totalMin >= 600 },
+        { id: 'b3', name: '自律达人', icon: '🎯', req: '累计满30小时', unlocked: totalMin >= 1800 },
+        { id: 'b4', name: '学海无涯', icon: '🚀', req: '累计满60小时', unlocked: totalMin >= 3600 },
+        { id: 'b5', name: '文曲星耀', icon: '👑', req: '累计满100小时', unlocked: totalMin >= 6000 }
+      ];
+
+      var activeSeat = activeRes ? seatById(activeRes.seat_id) : null;
+      return {
+        active_session: activeRes ? {
+          seat_id: activeRes.seat_id,
+          seat_name: activeSeat ? activeSeat.name : '自修座',
+          floor: activeSeat ? activeSeat.floor : 2,
+          active_minutes: activeMinutes,
+          start_time: activeRes.start_time
+        } : null,
+        today_formatted: (todayMin >= 60 ? Math.floor(todayMin/60) + '小时' : '') + (todayMin%60) + '分钟',
+        week_formatted: (weekMin / 60).toFixed(1) + '小时',
+        month_formatted: (monthMin / 60).toFixed(1) + '小时',
+        total_formatted: (totalMin / 60).toFixed(1) + '小时',
+        total_hours: totalHours,
+        badges: badges
+      };
+    },
+
+    leaderboard: function (type) {
+      type = type || 'daily';
+      var u = currentUser();
+      var myId = u ? u.id : 2;
+      var myStats = API.studyStats(myId);
+      var myTodayHours = parseFloat((parseFloat(myStats.today_formatted) || 2.5).toFixed(1));
+
+      var baseList = [
+        { rank: 1, name: '高旭', role: '电气学霸', daily: '7.8小时', weekly: '36.5小时', total: '148.0小时', title: '👑 文曲星耀', hours: type === 'daily' ? 7.8 : (type === 'weekly' ? 36.5 : 148.0) },
+        { rank: 2, name: '张雨豪', role: '自律先锋', daily: '6.5小时', weekly: '32.0小时', total: '136.5小时', title: '🚀 学海无涯', hours: type === 'daily' ? 6.5 : (type === 'weekly' ? 32.0 : 136.5) },
+        { rank: 3, name: '毛明宇', role: '科研达人', daily: '5.9小时', weekly: '29.4小时', total: '125.0小时', title: '🎯 自律达人', hours: type === 'daily' ? 5.9 : (type === 'weekly' ? 29.4 : 125.0) },
+        { rank: 4, name: '林同学', role: '考研备考', daily: '5.2小时', weekly: '26.8小时', total: '112.0小时', title: '🎯 自律达人', hours: type === 'daily' ? 5.2 : (type === 'weekly' ? 26.8 : 112.0) },
+        { rank: 5, name: (u ? u.nickname : '张同学') + ' (我)', role: '电气自律标兵', daily: (myTodayHours || 4.2) + '小时', weekly: '22.5小时', total: (myStats ? myStats.total_formatted : '45.0小时'), title: '🌅 晨光熹微', hours: type === 'daily' ? (myTodayHours || 4.2) : (type === 'weekly' ? 22.5 : 45.0), isMe: true },
+        { rank: 6, name: '陈同学', role: '竞赛冲刺', daily: '3.8小时', weekly: '19.2小时', total: '88.5小时', title: '🌅 晨光熹微', hours: type === 'daily' ? 3.8 : (type === 'weekly' ? 19.2 : 88.5) },
+        { rank: 7, name: '李同学', role: '日常研习', daily: '3.0小时', weekly: '15.6小时', total: '62.0小时', title: '🌱 初出茅庐', hours: type === 'daily' ? 3.0 : (type === 'weekly' ? 15.6 : 62.0) }
+      ];
+
+      baseList.sort(function(a, b) { return b.hours - a.hours; });
+      baseList.forEach(function(item, idx) { item.rank = idx + 1; });
+
+      var myRankItem = baseList.find(function(x) { return x.isMe; }) || baseList[4];
+      return {
+        type: type,
+        leaderboard: baseList,
+        my_rank: {
+          rank: myRankItem.rank,
+          hours_formatted: myRankItem.daily,
+          beat_rate: Math.max(75, 100 - myRankItem.rank * 6) + '%'
+        }
+      };
+    },
+
     CONFIG: CONFIG,
     // 生命周期
     init: function () { load(); return API; },
@@ -1412,10 +1669,14 @@ window.ZSX_ANNOT = {"w":640,"h":360,"frames":[{"t":0.0,"b":[[340,26,60,40,0],[28
         '<nav class="desktop-tabs">' +
           '<button class="tab-btn active" data-tab="book">🏢 分区选座与预约</button>' +
           '<button class="tab-btn" data-tab="schedule">🗓️ 座位时段一览</button>' +
+          '<button class="tab-btn" data-tab="leaderboard">🏆 学霸学时榜</button>' +
+          '<button class="tab-btn" data-tab="stats">⏱️ 学习时长看板</button>' +
           '<button class="tab-btn" data-tab="mine">📋 我的预约</button>' +
         '</nav>' +
         '<div id="panel-book" class="panel"></div>' +
         '<div id="panel-schedule" class="panel hidden"></div>' +
+        '<div id="panel-leaderboard" class="panel hidden"></div>' +
+        '<div id="panel-stats" class="panel hidden"></div>' +
         '<div id="panel-mine" class="panel hidden"></div>' +
       '</div>' +
       '<div class="float-bar" id="float-bar">' +
@@ -1423,9 +1684,11 @@ window.ZSX_ANNOT = {"w":640,"h":360,"frames":[{"t":0.0,"b":[[340,26,60,40,0],[28
         '<button class="btn-submit" id="btn-reserve-m">✅ 立即预定</button>' +
       '</div>' +
       '<nav class="mobile-tab-bar">' +
-        '<a class="tab-item active" data-tab="book"><span class="ico">🏢</span><span>选座预约</span></a>' +
-        '<a class="tab-item" data-tab="schedule"><span class="ico">🗓️</span><span>时段看板</span></a>' +
-        '<a class="tab-item" data-tab="mine"><span class="ico">📋</span><span>我的预约</span></a>' +
+        '<a class="tab-item active" data-tab="book"><span class="ico">🏢</span><span>选座</span></a>' +
+        '<a class="tab-item" data-tab="schedule"><span class="ico">🗓️</span><span>时段</span></a>' +
+        '<a class="tab-item" data-tab="leaderboard"><span class="ico">🏆</span><span>学霸榜</span></a>' +
+        '<a class="tab-item" data-tab="stats"><span class="ico">⏱️</span><span>学时</span></a>' +
+        '<a class="tab-item" data-tab="mine"><span class="ico">📋</span><span>我的</span></a>' +
       '</nav>';
 
     $('#btn-out').addEventListener('click', function () {
@@ -1500,6 +1763,8 @@ window.ZSX_ANNOT = {"w":640,"h":360,"frames":[{"t":0.0,"b":[[340,26,60,40,0],[28
 
     if (name === 'book') renderBookPanel();
     else if (name === 'schedule') renderSchedulePanel();
+    else if (name === 'leaderboard') renderLeaderboardPanel();
+    else if (name === 'stats') renderStudyStatsPanel();
     else if (name === 'mine') renderMinePanel();
 
     updateFloatBar();
@@ -1775,6 +2040,168 @@ window.ZSX_ANNOT = {"w":640,"h":360,"frames":[{"t":0.0,"b":[[340,26,60,40,0],[28
   }
 
   /* ------------------------------ 我的预约 ------------------------------ */
+  
+  /* ==================== 学习时长看板与学霸排行榜渲染函数 ==================== */
+  function renderStudyStatsPanel() {
+    var p = $('#panel-stats');
+    if (!p) return;
+    var u = Z.currentUser();
+    var stats = Z.studyStats(u ? u.id : 2);
+    if (!stats) return;
+
+    var heroHtml = '';
+    if (stats.active_session) {
+      heroHtml =
+        '<div class="stats-hero-card">' +
+          '<div>' +
+            '<div class="stats-hero-title"><span class="stats-pulse-dot"></span> 正在馆自律学习中</div>' +
+            '<div class="stats-hero-desc">当前就座：' + esc(stats.active_session.seat_name) + '（' + stats.active_session.floor + 'F） · 开始于 ' + stats.active_session.start_time.substr(11, 5) + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-size:0.8rem;opacity:0.85;">当前已专注</div>' +
+            '<div style="font-size:1.8rem;font-weight:800;color:#fde047;">' + stats.active_session.active_minutes + ' <span style="font-size:1rem;">分钟</span></div>' +
+          '</div>' +
+        '</div>';
+    } else {
+      heroHtml =
+        '<div class="stats-hero-card" style="background:linear-gradient(135deg, #334155, #1e293b);">' +
+          '<div>' +
+            '<div class="stats-hero-title">☕ 当前未在座学习</div>' +
+            '<div class="stats-hero-desc">快去【选座预约】挑选心仪座位，开启今日自律学霸之旅吧！</div>' +
+          '</div>' +
+          '<button class="btn-submit" style="padding:8px 16px;background:white;color:#1e293b;border:none;border-radius:20px;font-weight:bold;cursor:pointer;" onclick="window.__ZSX_UI.UIS.tab=\'book\';window.__ZSX_UI.route();">去选座 »</button>' +
+        '</div>';
+    }
+
+    var gridHtml =
+      '<div class="stats-grid">' +
+        '<div class="stats-card">' +
+          '<div class="stats-lbl">📅 今日学习时长</div>' +
+          '<div class="stats-val">' + stats.today_formatted + '</div>' +
+          '<div style="font-size:0.75rem;color:#10b981;">今日已达成专注目标</div>' +
+        '</div>' +
+        '<div class="stats-card">' +
+          '<div class="stats-lbl">📊 本周累计学时</div>' +
+          '<div class="stats-val" style="color:#059669;">' + stats.week_formatted + '</div>' +
+          '<div style="font-size:0.75rem;color:#64748b;">近7天累计有效时长</div>' +
+        '</div>' +
+        '<div class="stats-card">' +
+          '<div class="stats-lbl">📈 本月研习学时</div>' +
+          '<div class="stats-val" style="color:#7c3aed;">' + stats.month_formatted + '</div>' +
+          '<div style="font-size:0.75rem;color:#64748b;">自然月度自律汇总</div>' +
+        '</div>' +
+        '<div class="stats-card">' +
+          '<div class="stats-lbl">🏆 历史总自习学时</div>' +
+          '<div class="stats-val" style="color:#d97706;">' + stats.total_formatted + '</div>' +
+          '<div style="font-size:0.75rem;color:#64748b;">个人成长知识见证</div>' +
+        '</div>' +
+      '</div>';
+
+    var badgesHtml = '<h3 style="margin:1.8rem 0 0.5rem;font-size:1.1rem;color:#1e293b;">🎖️ 学霸自律成就勋章墙</h3><div class="badge-grid">';
+    stats.badges.forEach(function(b) {
+      badgesHtml +=
+        '<div class="badge-card ' + (b.unlocked ? 'unlocked' : 'locked') + '">' +
+          '<div class="badge-icon">' + b.icon + '</div>' +
+          '<div class="badge-name">' + b.name + '</div>' +
+          '<div class="badge-req">' + b.req + '</div>' +
+          '<div style="margin-top:6px;font-size:0.75rem;font-weight:bold;color:' + (b.unlocked ? '#059669' : '#94a3b8') + ';">' + (b.unlocked ? '✓ 已解锁' : '未解锁') + '</div>' +
+        '</div>';
+    });
+    badgesHtml += '</div>';
+
+    p.innerHTML = heroHtml + gridHtml + badgesHtml;
+  }
+
+  var currentLbType = 'daily';
+  function renderLeaderboardPanel() {
+    var p = $('#panel-leaderboard');
+    if (!p) return;
+
+    var data = Z.leaderboard(currentLbType);
+    var items = data.leaderboard;
+    var myRank = data.my_rank;
+
+    var heroHtml =
+      '<div class="lb-hero">' +
+        '<h3>🏆 西南大学工程技术学院 · 图书馆学霸风云榜</h3>' +
+        '<p>“学如逆水行舟，每一分钟的专注都在定义你的未来”</p>' +
+      '</div>';
+
+    var tabsHtml =
+      '<div class="lb-tabs">' +
+        '<button class="lb-tab-pill ' + (currentLbType === 'daily' ? 'active' : '') + '" data-lb="daily">🥇 今日学霸日榜</button>' +
+        '<button class="lb-tab-pill ' + (currentLbType === 'weekly' ? 'active' : '') + '" data-lb="weekly">🥈 本周毅力周榜</button>' +
+        '<button class="lb-tab-pill ' + (currentLbType === 'total' ? 'active' : '') + '" data-lb="total">🏅 历史学霸总榜</button>' +
+      '</div>';
+
+    var myRankHtml =
+      '<div class="my-rank-banner">' +
+        '<div>' +
+          '<div class="my-rank-title">我的当前排名：第 ' + myRank.rank + ' 名</div>' +
+          '<div style="font-size:0.85rem;color:#64748b;margin-top:2px;">今日学习时长：' + myRank.hours_formatted + ' · 已击败全校 ' + myRank.beat_rate + ' 的自习同学</div>' +
+        '</div>' +
+        '<span class="my-rank-badge">自律标兵</span>' +
+      '</div>';
+
+    var top1 = items[0] || { name: '高旭', hours: 7.8 };
+    var top2 = items[1] || { name: '张雨豪', hours: 6.5 };
+    var top3 = items[2] || { name: '毛明宇', hours: 5.9 };
+
+    var podiumHtml =
+      '<div class="podium-container">' +
+        '<div class="podium-step podium-2">' +
+          '<div class="podium-avatar">🥈</div>' +
+          '<div class="podium-name">' + esc(top2.name) + '</div>' +
+          '<div class="podium-time">' + (currentLbType === 'daily' ? top2.daily : (currentLbType === 'weekly' ? top2.weekly : top2.total)) + '</div>' +
+          '<div class="podium-medal">2</div>' +
+        '</div>' +
+        '<div class="podium-step podium-1">' +
+          '<div style="font-size:1.4rem;margin-bottom:-4px;">👑</div>' +
+          '<div class="podium-avatar" style="border-color:#fef08a;">🥇</div>' +
+          '<div class="podium-name">' + esc(top1.name) + '</div>' +
+          '<div class="podium-time">' + (currentLbType === 'daily' ? top1.daily : (currentLbType === 'weekly' ? top1.weekly : top1.total)) + '</div>' +
+          '<div class="podium-medal">1</div>' +
+        '</div>' +
+        '<div class="podium-step podium-3">' +
+          '<div class="podium-avatar">🥉</div>' +
+          '<div class="podium-name">' + esc(top3.name) + '</div>' +
+          '<div class="podium-time">' + (currentLbType === 'daily' ? top3.daily : (currentLbType === 'weekly' ? top3.weekly : top3.total)) + '</div>' +
+          '<div class="podium-medal">3</div>' +
+        '</div>' +
+      '</div>';
+
+    var maxHours = items[0] ? items[0].hours : 10;
+    var listHtml = '<div class="lb-list">';
+    items.forEach(function(item) {
+      var pct = Math.min(100, Math.round((item.hours / maxHours) * 100));
+      var rankCls = item.rank === 1 ? 'top1' : (item.rank === 2 ? 'top2' : (item.rank === 3 ? 'top3' : ''));
+      listHtml +=
+        '<div class="lb-row" style="' + (item.isMe ? 'background:#eff6ff;' : '') + '">' +
+          '<div class="lb-rank-num ' + rankCls + '">' + item.rank + '</div>' +
+          '<div class="lb-user-info">' +
+            '<div class="lb-user-name">' +
+              esc(item.name) +
+              (item.title ? '<span class="lb-user-title">' + esc(item.title) + '</span>' : '') +
+              (item.isMe ? '<span style="background:#2563eb;color:white;font-size:0.7rem;padding:1px 5px;border-radius:4px;margin-left:4px;">我</span>' : '') +
+            '</div>' +
+            '<div class="lb-bar-wrap"><div class="lb-bar-fill" style="width:' + pct + '%;"></div></div>' +
+          '</div>' +
+          '<div class="lb-hours">' + (currentLbType === 'daily' ? item.daily : (currentLbType === 'weekly' ? item.weekly : item.total)) + '</div>' +
+        '</div>';
+    });
+    listHtml += '</div>';
+
+    p.innerHTML = heroHtml + tabsHtml + myRankHtml + podiumHtml + listHtml;
+
+    $$('.lb-tab-pill').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        currentLbType = btn.dataset.lb;
+        renderLeaderboardPanel();
+      });
+    });
+  }
+
+
   function renderMinePanel() {
     $('#panel-mine').innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem;">' +
